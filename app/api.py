@@ -30,7 +30,8 @@ def create_app(settings: Settings | None = None, extractor=None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         storage.initialize()
-        async with httpx.AsyncClient() as client:
+        # A local model must be reached directly, not through machine-wide proxies.
+        async with httpx.AsyncClient(trust_env=False) as client:
             app.state.extractor = extractor or QwenExtractor(client, settings)
             yield
 

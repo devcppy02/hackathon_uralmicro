@@ -187,36 +187,55 @@ Invoke-RestMethod http://172.20.10.6:1234/v1/models
 ## Демонстрация в PowerShell
 
 При работающем сервере этот пример создаёт звонок с текущим временем,
-получает задачи оператора и проводит одну задачу через два статуса:
+получает задачи оператора и проводит одну задачу через два статуса.
+Выполните блок целиком: при первой ошибке сценарий остановится.
 
 ```powershell
-$base = "http://localhost:8080"
-$end = [DateTimeOffset]::Now
-$call = @{
-    id = [guid]::NewGuid().ToString()
-    operator_id = 7
-    client_phone = "+70000000000"
-    started_at = $end.AddMinutes(-5).ToString("o")
-    ended_at = $end.ToString("o")
-    transcript = @(
-        @{ speaker = "client"; text = "Мне нужен договор." }
-        @{ speaker = "operator"; text = "Договор вышлю через час. Перезвоню через два часа." }
-    )
+& {
+    $ErrorActionPreference = "Stop"
+    $base = "http://localhost:8080"
+    $end = [DateTimeOffset]::Now
+    $call = @{
+        id = [guid]::NewGuid().ToString()
+        operator_id = 7
+        client_phone = "+70000000000"
+        started_at = $end.AddMinutes(-5).ToString("o")
+        ended_at = $end.ToString("o")
+        transcript = @(
+            @{ speaker = "client"; text = "Мне нужен договор." }
+            @{ speaker = "operator"; text = "Договор вышлю через час. Перезвоню через два часа." }
+        )
+    }
+    $json = ConvertTo-Json -InputObject @($call) -Depth 6
+    $body = [System.Text.Encoding]::UTF8.GetBytes($json)
+    $result = Invoke-RestMethod -Method Post -Uri "$base/calls" `
+        -ContentType "application/json; charset=utf-8" -Body $body -TimeoutSec 180
+    if (@($result.tasks).Count -ne 2) {
+        throw "Ожидались две задачи. Проверьте ответ POST /calls."
+    }
+    $result.tasks | Format-Table id, type_code, due_at, status
+    Invoke-RestMethod "$base/tasks?operator_id=7&status=created"
+    $taskId = $result.tasks[0].id
+    Invoke-RestMethod -Method Patch -Uri "$base/tasks/$taskId" `
+        -ContentType "application/json" -Body '{"status":"in_progress"}'
+    Invoke-RestMethod -Method Patch -Uri "$base/tasks/$taskId" `
+        -ContentType "application/json" -Body '{"status":"completed"}'
+    $repeat = Invoke-RestMethod -Method Post -Uri "$base/calls" `
+        -ContentType "application/json; charset=utf-8" -Body $body -TimeoutSec 180
+    if ($repeat.duplicates -ne 1 -or $repeat.tasks_created -ne 0) {
+        throw "Повтор звонка должен вернуть duplicates=1 и tasks_created=0."
+    }
+    $repeat | Select-Object processed, duplicates, tasks_created
 }
-$json = ConvertTo-Json -InputObject @($call) -Depth 6
-$body = [System.Text.Encoding]::UTF8.GetBytes($json)
-$result = Invoke-RestMethod -Method Post -Uri "$base/calls" `
-    -ContentType "application/json; charset=utf-8" -Body $body -TimeoutSec 180
-$result.tasks | Format-Table id, type_code, due_at, status
-Invoke-RestMethod "$base/tasks?operator_id=7&status=created"
-$taskId = $result.tasks[0].id
-Invoke-RestMethod -Method Patch -Uri "$base/tasks/$taskId" `
-    -ContentType "application/json" -Body '{"status":"in_progress"}'
-Invoke-RestMethod -Method Patch -Uri "$base/tasks/$taskId" `
-    -ContentType "application/json" -Body '{"status":"completed"}'
 ```
 
-Повторный POST с тем же `$body` покажет `duplicates=1`, `tasks_created=0`.
+Последний POST повторяет тот же звонок и проверяет отсутствие дублей.
+
+Если старая версия возвращает `LM Studio returned HTTP 403`, причиной может быть
+системный прокси: сравните запросы Python с `trust_env=True` и `trust_env=False`.
+При ответах `403` через прокси и `200` напрямую обновите проект (`git pull`)
+и перезапустите API. HTTP-клиент модели теперь использует `trust_env=False`,
+поэтому локальные запросы не перехватываются настройками прокси компьютера.
 
 ## Тесты
 
