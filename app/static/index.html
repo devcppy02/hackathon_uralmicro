@@ -5,72 +5,105 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>УралМикро — контроль обещаний</title>
     <meta name="color-scheme" content="light" />
-    <meta name="theme-color" content="#152e25" />
+    <meta name="theme-color" content="#f6f5f2" />
     <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/static/style.css" />
-    <script src="/static/app.js" defer></script>
+    <link rel="stylesheet" href="/static/style.css?v=4" />
+    <script src="/static/app.js?v=4" defer></script>
   </head>
   <body>
+    <a class="skip-link" href="#content">Перейти к содержимому</a>
     <aside class="sidebar">
-      <a class="brand" href="/"
-        ><span class="brand-mark">у<span>м</span></span
-        ><span>УралМикро<small>РАБОЧЕЕ ПРОСТРАНСТВО</small></span></a
-      >
-      <div class="workspace-label">КОНТАКТ-ЦЕНТР</div>
-      <nav id="navigation">
-        <button data-view="tasks" class="nav-item active" title="Задачи">
+      <a class="brand" href="/" aria-label="УралМикро — главная">
+        <span class="brand-mark" aria-hidden="true">ум</span>
+        <span class="brand-name"
+          >УралМикро<small>Контроль обещаний</small></span
+        >
+      </a>
+      <div class="workspace-label">Контакт-центр</div>
+      <nav id="navigation" aria-label="Основная навигация">
+        <button
+          data-view="tasks"
+          class="nav-item active"
+          title="Задачи"
+          aria-label="Задачи"
+          aria-current="page"
+        >
           <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
             <rect x="5" y="4" width="14" height="17" rx="2" />
             <path d="M9 4V2h6v2M9 9h6M9 13h6M9 17h4" /></svg
-          >Задачи<span id="nav-task-count" class="nav-count">0</span>
+          ><span class="nav-label" data-short="Задачи">Задачи</span
+          ><span id="nav-task-count" class="nav-count">0</span>
         </button>
-        <button data-view="summary" class="nav-item" title="Сводка">
+        <button
+          data-view="summary"
+          class="nav-item"
+          title="Сводка"
+          aria-label="Сводка"
+        >
           <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
             <path d="M4 4v16h17M8 16v-5M13 16V6M18 16V9" /></svg
-          >Сводка
+          ><span class="nav-label" data-short="Сводка">Сводка</span>
         </button>
-        <button data-view="types" class="nav-item" title="Типы обещаний">
+        <button
+          data-view="types"
+          class="nav-item"
+          title="Типы обещаний"
+          aria-label="Типы обещаний"
+        >
           <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
             <path d="m12 3 9 5-9 5-9-5 9-5ZM3 12l9 5 9-5M3 16l9 5 9-5" /></svg
-          >Типы обещаний
+          ><span class="nav-label" data-short="Типы">Типы обещаний</span>
         </button>
-        <button data-view="notifications" class="nav-item" title="Уведомления">
+        <button
+          data-view="notifications"
+          class="nav-item"
+          title="Уведомления"
+          aria-label="Уведомления"
+        >
           <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
             <path
               d="M5 16h14l-2-3V9a5 5 0 0 0-10 0v4l-2 3ZM10 20h4M12 2v2"
             /></svg
-          >Уведомления
+          ><span class="nav-label" data-short="Уведомления">Уведомления</span>
         </button>
-        <button data-view="calls" class="nav-item" title="Приём звонков">
+        <button
+          data-view="calls"
+          class="nav-item"
+          title="Приём звонков"
+          aria-label="Приём звонков"
+        >
           <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
             <path
               d="M14 3h7v7M21 3l-8 8M7 4 4 5c-2 5 10 17 15 15l1-3-5-3-2 2-5-5 2-2-3-5Z"
             /></svg
-          >Приём звонков
+          ><span class="nav-label" data-short="Звонки">Приём звонков</span>
         </button>
       </nav>
-      <div class="sidebar-bottom">
-        <div class="status-dot"></div>
-        <span>Локальное приложение<small>FastAPI · SQLite · Qwen</small></span>
-      </div>
     </aside>
     <main>
       <header class="topbar">
+        <a class="mobile-brand" href="/">УралМикро</a>
         <span class="breadcrumb"
-          >Рабочее пространство <span>/</span>
-          <b id="breadcrumb">Задачи</b></span
+          >Контакт-центр <span>/</span> <b id="breadcrumb">Задачи</b></span
         >
         <div class="topbar-right">
-          <a href="/docs" target="_blank" rel="noopener">API <span>↗</span></a
-          ><span class="avatar">ОП</span>
+          <a href="/docs" target="_blank" rel="noopener"
+            >Документация API
+            <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M14 4h6v6M20 4 10 14M10 4H4v16h16v-6" /></svg
+          ></a>
         </div>
       </header>
-      <div id="content" class="content">
-        <p>Загружаем рабочее пространство…</p>
+      <div id="content" class="content" tabindex="-1">
+        <p>Загружаем задачи…</p>
       </div>
     </main>
-    <dialog id="task-dialog"><div id="task-detail"></div></dialog>
-    <dialog id="type-dialog"><div id="type-detail"></div></dialog>
+    <dialog id="task-dialog" aria-label="Карточка задачи">
+      <div id="task-detail"></div>
+    </dialog>
+    <dialog id="type-dialog" aria-label="Тип обещания">
+      <div id="type-detail"></div>
+    </dialog>
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
   </body>
 </html>
