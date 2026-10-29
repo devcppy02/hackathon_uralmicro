@@ -115,30 +115,48 @@ const options = (selected = "") =>
     .join("");
 const actor = () => localStorage.getItem("uralmicro_actor") || "Оператор";
 
-function heading(eyebrow, title, subtitle, actions = "") {
-  return `<div class="page-heading"><div><div class="eyebrow">${eyebrow}</div><h1>${title}</h1><div class="subtitle">${subtitle}</div></div><div class="heading-actions">${actions}</div></div>`;
+const icon = (name) => {
+  const paths = {
+    refresh:
+      "M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 11-1l3 3M4 15l3 3a7 7 0 0 0 11-1",
+    plus: "M12 5v14M5 12h14",
+    chevron: "m9 5 7 7-7 7",
+    close: "m6 6 12 12M6 18 18 6",
+    arrow: "M5 12h14m-6-6 6 6-6 6",
+    check: "m5 12 4 4L19 6",
+  };
+  return `<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="${paths[name]}"/></svg>`;
+};
+const refreshButton = () =>
+  `<button class="button" data-refresh>${icon("refresh")}Обновить</button>`;
+
+function heading(title, subtitle, actions = "") {
+  return `<div class="page-heading"><div><h1>${title}</h1><div class="subtitle">${subtitle}</div></div><div class="heading-actions">${actions}</div></div>`;
 }
 
 function kpis(data) {
   const items = [
-    ["Всего задач", data.total, "Все договорённости", "▤", ""],
-    ["В работе", data.in_progress, "Оператор приступил к задаче", "↗", ""],
-    ["Выполнено", data.completed, "Обязательства закрыты", "✓", "highlight"],
-    ["Просрочено", data.overdue, "Требуют внимания", "◷", "warning"],
+    ["Всего задач", data.total, ""],
+    ["В работе", data.in_progress, ""],
+    ["Выполнено", data.completed, ""],
+    ["Просрочено", data.overdue, data.overdue ? "warning" : ""],
   ];
-  return `<div class="kpi-grid">${items.map(([label, value, foot, icon, style]) => `<div class="kpi ${style}"><div class="kpi-label">${label}<span>${icon}</span></div><div class="kpi-value">${value}</div><div class="kpi-foot">${foot}</div></div>`).join("")}</div>`;
+  return `<dl class="kpi-grid" aria-label="Количество задач">${items.map(([label, value, style]) => `<div class="kpi ${style}"><dt>${label}</dt><dd>${value}</dd></div>`).join("")}</dl>`;
 }
 
 function empty(title, description, action = "") {
-  return `<div class="empty"><div class="empty-icon">✓</div><h3>${title}</h3><p>${description}</p>${action}</div>`;
+  return `<div class="empty"><h3>${title}</h3><p>${description}</p>${action}</div>`;
 }
 
 async function navigate(view) {
   state.view = view;
   $("#content").classList.remove("view-enter");
-  $$(".nav-item").forEach((button) =>
-    button.classList.toggle("active", button.dataset.view === view),
-  );
+  $$(".nav-item").forEach((button) => {
+    button.classList.toggle("active", button.dataset.view === view);
+    if (button.dataset.view === view)
+      button.setAttribute("aria-current", "page");
+    else button.removeAttribute("aria-current");
+  });
   $("#breadcrumb").textContent = views[view];
   $("#content").innerHTML = '<div class="loading">Загружаем данные…</div>';
   try {
@@ -194,25 +212,23 @@ async function loadTasks() {
       (
         task,
       ) => `<tr class="task-row" data-task="${esc(task.id)}" tabindex="0" aria-label="Открыть задачу: ${esc(task.title)}">
-    <td class="task-main"><strong>${esc(task.title)}${suggestions.some((s) => s.task_id === task.id) ? '<span class="evidence-dot" title="Есть подтверждение в следующем звонке"> ● Проверить</span>' : ""}</strong><small>${esc(typeName(task.type_code))}</small></td>
-    <td class="mono">${esc(task.client_phone)}</td><td><span class="operator-chip"><b>${task.operator_id}</b>Оператор ${task.operator_id}</span></td>
-    <td><span class="deadline-date ${task.status === "overdue" ? "deadline-late" : ""}">${esc(date(task.due_at))}</span><span class="deadline-time">${task.deadline_source === "default_24h" ? "24 часа по умолчанию" : task.deadline_source === "manual" ? "Уточнён вручную" : "Из разговора"}</span></td>
-    <td>${badge(task.status)}</td><td style="color:#a6b39f">↗</td></tr>`,
+    <td class="task-main"><strong>${esc(task.title)}</strong><small>${esc(typeName(task.type_code))}${suggestions.some((s) => s.task_id === task.id) ? '<span class="evidence-dot">Проверить выполнение</span>' : ""}</small></td>
+    <td class="mono">${esc(task.client_phone)}</td><td><span class="operator-chip">Оператор <b>${task.operator_id}</b></span></td>
+    <td><span class="deadline-date ${task.status === "overdue" ? "deadline-late" : ""}">${esc(new Date(task.due_at).toLocaleDateString("ru-RU", { day: "numeric", month: "short", ...(new Date(task.due_at).getFullYear() !== new Date().getFullYear() ? { year: "numeric" } : {}) }))}<span class="deadline-hour">${esc(date(task.due_at, true))}</span></span><span class="deadline-time">${task.deadline_source === "default_24h" ? "24 часа по умолчанию" : task.deadline_source === "manual" ? "Уточнён вручную" : "Из разговора"}</span></td>
+    <td>${badge(task.status)}</td><td class="row-chevron">${icon("chevron")}</td></tr>`,
     )
     .join("");
   $("#content").innerHTML =
     heading(
-      "Контроль обещаний",
-      "Задачи операторов",
-      "Договорённости из звонков — под контролем.",
-      `<span class="date-note">${esc(new Date().toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" }))}</span><button class="button" data-refresh>↻ Обновить</button>`,
+      "Задачи",
+      "Обещания из звонков, сроки и история выполнения.",
+      `${refreshButton()}<button class="button primary" data-goto="calls">${icon("plus")}Принять звонок</button>`,
     ) +
-    `<div class="total-note">Обзор по всем срокам${filters.operator_id ? ` · оператор ${esc(filters.operator_id)}` : ""}</div>` +
     kpis(summary.totals) +
     (suggestions.length
-      ? `<div class="evidence-strip"><span class="evidence-strip-icon">✓</span><div><strong>Найдены подтверждения выполнения</strong><small>Предложений: ${suggestions.length}. Проверьте цитаты из следующих звонков перед закрытием задач.</small></div><button class="button small" data-task="${esc(suggestions[0].task_id)}">Рассмотреть →</button></div>`
+      ? `<div class="evidence-strip"><div><strong>Есть подтверждения выполнения <span class="evidence-count">${suggestions.length}</span></strong><small>В следующем звонке найдены реплики о выполнении. Проверьте цитату.</small></div><button class="button small" data-task="${esc(suggestions[0].task_id)}">Рассмотреть${icon("arrow")}</button></div>`
       : "") +
-    `<section class="panel"><div class="panel-header"><div class="panel-title"><h2>Все обязательства</h2><small>Найдено ${page.total} · сначала ближайший срок</small></div><button class="button primary" data-goto="calls">＋ Принять звонок</button></div>
+    `<section class="panel task-panel"><div class="panel-header"><div class="panel-title"><h2>Реестр обещаний <span class="record-count">${page.total}</span></h2><small>По сроку выполнения${filters.operator_id ? ` · оператор ${esc(filters.operator_id)}` : ""}</small></div><span class="table-caption">${esc(new Date().toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" }))}</span></div>
     <form id="filters" class="filters"><label>Статус<select name="status"><option value="">Все статусы</option>${Object.entries(
       labels,
     )
@@ -231,11 +247,11 @@ async function loadTasks() {
         : empty(
             "Задач пока нет",
             "Измените фильтры или примите первый звонок. Найденные обещания появятся здесь.",
-            '<button class="button" data-goto="calls">Принять звонок →</button>',
+            '<button class="button" data-goto="calls">Принять звонок</button>',
           )
     }
-    <div class="table-footer"><span>${page.total ? state.offset + 1 : 0}–${Math.min(state.offset + state.limit, page.total)} из ${page.total}</span><div class="pagination"><button class="button small" id="prev-page" ${state.offset === 0 ? "disabled" : ""}>←</button><button class="button small" id="next-page" ${state.offset + state.limit >= page.total ? "disabled" : ""}>→</button></div></div></section>
-    <div class="page-note"><span>●</span>Данные обновляются каждые 20 секунд. Нажмите на задачу, чтобы посмотреть цитату и историю.</div>`;
+    <div class="table-footer"><span>${page.total ? state.offset + 1 : 0}–${Math.min(state.offset + state.limit, page.total)} из ${page.total}</span><div class="pagination"><button class="button small" id="prev-page" aria-label="Предыдущая страница" ${state.offset === 0 ? "disabled" : ""}>←</button><button class="button small" id="next-page" aria-label="Следующая страница" ${state.offset + state.limit >= page.total ? "disabled" : ""}>→</button></div></div></section>
+    <div class="page-note"><span>Обновление каждые 20 секунд</span><span>Выберите задачу, чтобы открыть цитату и историю.</span></div>`;
   $("#filters").addEventListener("submit", (event) => {
     event.preventDefault();
     state.filters = {};
@@ -271,14 +287,14 @@ async function openTask(id) {
     ]);
     const evidence = proposals.filter((item) => item.task_id === id);
     $("#task-detail").innerHTML =
-      `<div class="dialog-heading"><div><div class="eyebrow">Карточка задачи</div><h2>${esc(typeName(task.type_code))}</h2></div><button class="button icon" data-close="task-dialog" aria-label="Закрыть">×</button></div>
+      `<div class="dialog-heading"><div><div class="eyebrow">${esc(typeName(task.type_code))}</div><h2>${esc(task.title)}</h2></div><button class="button icon" data-close="task-dialog" aria-label="Закрыть">${icon("close")}</button></div>
     <div class="dialog-body"><div class="detail-meta">${badge(task.status)}<span>Оператор ${task.operator_id}</span><span class="mono">${esc(task.client_phone)}</span></div>
     ${evidence.map((item) => `<div class="evidence-card"><span class="badge pending">Возможно, выполнена</span><h3>Подтверждение в следующем звонке</h3><blockquote>${esc(item.quote)}</blockquote><p>${esc(item.explanation)} · ${item.speaker === "client" ? "Клиент" : "Оператор"}</p><div class="details-id">Звонок ${esc(item.call_id)} · реплика ${item.replica_index + 1}</div><div class="evidence-actions"><button class="button primary small" data-review="${esc(item.id)}" data-accept="true">Подтвердить выполнение</button><button class="button small" data-review="${esc(item.id)}" data-accept="false">Отклонить</button></div></div>`).join("")}
     <form id="correction-form" class="form-grid"><label>Задача<input name="title" value="${esc(task.title)}" maxlength="500" required ${task.status === "completed" ? "disabled" : ""}></label>
     <div class="form-row"><label>Тип обещания<select name="type_code" ${task.status === "completed" ? "disabled" : ""}>${options(task.type_code)}</select></label><label>Срок · местное время<input name="due_at" type="datetime-local" value="${localValue(task.due_at)}" required ${task.status === "completed" ? "disabled" : ""}></label></div>
     <div><span class="hint">ИСТОЧНИК · реплика ${task.replica_index + 1}</span><blockquote>${esc(task.quote)}</blockquote></div>
     <div class="form-row"><label>Автор изменения<input name="actor" value="${esc(actor())}" required maxlength="100"></label><label>Причина корректировки<input name="reason" placeholder="Например: клиент уточнил срок" minlength="3" maxlength="1000" ${task.status === "completed" ? "disabled" : ""}></label></div>
-    <div class="dialog-footer"><button class="button" type="submit" ${task.status === "completed" ? "disabled" : ""}>Сохранить корректировку</button><div>${task.status === "created" ? '<button type="button" class="button primary" data-status="in_progress">Взять в работу →</button>' : task.status !== "completed" ? '<button type="button" class="button primary" data-status="completed">✓ Отметить выполненной</button>' : '<span class="badge completed">✓ Задача закрыта</span>'}</div></div></form>
+    <div class="dialog-footer"><button class="button" type="submit" ${task.status === "completed" ? "disabled" : ""}>Сохранить корректировку</button><div>${task.status === "created" ? '<button type="button" class="button primary" data-status="in_progress">Взять в работу</button>' : task.status !== "completed" ? '<button type="button" class="button primary" data-status="completed">Отметить выполненной</button>' : '<span class="badge completed">Задача закрыта</span>'}</div></div></form>
     <div class="dialog-section"><h3>История изменений</h3><ul class="history-list">${
       history.length
         ? history
@@ -382,25 +398,23 @@ async function loadSummary() {
   const data = await api("/summary");
   $("#content").innerHTML =
     heading(
-      "Контакт-центр",
       "Сводка руководителя",
       "Текущее состояние обязательств по всем операторам.",
-      '<button class="button" data-refresh>↻ Обновить</button>',
+      refreshButton(),
     ) +
     kpis(data.totals) +
-    `<section class="panel"><div class="panel-header"><div class="panel-title"><h2>Результаты операторов</h2><small>Своевременность определяется по моменту закрытия задачи</small></div></div>${data.operators.length ? `<div class="table-scroll"><table class="operator-summary"><thead><tr><th>Оператор</th><th>Всего</th><th>Созданы</th><th>В работе</th><th>Просрочены</th><th>Выполнены в срок</th><th>После срока</th></tr></thead><tbody>${data.operators.map((op) => `<tr><td>Оператор ${op.operator_id}</td><td>${op.total}</td><td>${op.created}</td><td>${op.in_progress}</td><td>${op.overdue ? `<span class="badge overdue">${op.overdue}</span>` : "0"}</td><td>${op.completed_on_time}<div class="progress-track"><span style="width:${op.completed ? Math.round((op.completed_on_time / op.completed) * 100) : 0}%"></span></div></td><td>${op.completed_late}</td></tr>`).join("")}</tbody></table></div>` : empty("Пока нет данных", "Сводка появится после создания первых задач.")}</section><div class="note">Это операционная сводка, а не оценка точности Qwen. Проверяйте цитаты и отдельно измеряйте качество распознавания.</div>`;
+    `<section class="panel"><div class="panel-header"><div class="panel-title"><h2>Результаты операторов</h2><small>Своевременность определяется по моменту закрытия задачи</small></div></div>${data.operators.length ? `<div class="table-scroll"><table class="operator-summary"><thead><tr><th>Оператор</th><th>Всего</th><th>Созданы</th><th>В работе</th><th>Просрочены</th><th>Выполнены в срок</th><th>После срока</th></tr></thead><tbody>${data.operators.map((op) => `<tr><td>Оператор ${op.operator_id}</td><td>${op.total}</td><td>${op.created}</td><td>${op.in_progress}</td><td>${op.overdue ? `<span class="badge overdue">${op.overdue}</span>` : "0"}</td><td>${op.completed_on_time}<div class="progress-track" aria-hidden="true"><span style="width:${op.completed ? Math.round((op.completed_on_time / op.completed) * 100) : 0}%"></span></div></td><td>${op.completed_late}</td></tr>`).join("")}</tbody></table></div>` : empty("Пока нет данных", "Сводка появится после создания первых задач.")}</section><div class="page-note">Выполнение в срок — задача закрыта не позднее согласованной даты.</div>`;
 }
 
 async function loadTypes() {
   state.types = await api("/promise-types");
   $("#content").innerHTML =
     heading(
-      "Настройка распознавания",
       "Типы обещаний",
-      "Опишите новое обещание — Qwen начнёт находить его в следующих звонках.",
-      '<button class="button primary" id="add-type">＋ Добавить тип</button>',
+      "Категории действий, которые система находит в разговорах.",
+      `<button class="button primary" id="add-type">${icon("plus")}Добавить тип</button>`,
     ) +
-    `<div class="type-grid">${state.types.map((type) => `<article class="type-card"><div class="type-icon">◇</div><h3>${esc(type.name)}</h3><p>${esc(type.description)}</p><footer><code>${esc(type.code)}</code><button class="button small" data-type="${esc(type.code)}">Изменить ↗</button></footer></article>`).join("")}</div><div class="page-note"><span>●</span>Изменение типа не пересчитывает уже обработанные звонки.</div>`;
+    `<section class="panel type-list"><div class="panel-header"><h2>Справочник <span class="record-count">${state.types.length}</span></h2><span class="table-caption">Применяется к новым звонкам</span></div>${state.types.map((type, index) => `<article class="type-row"><span class="type-number">${String(index + 1).padStart(2, "0")}</span><div class="type-description"><h3>${esc(type.name)}</h3><p>${esc(type.description)}</p><code>${esc(type.code)}</code></div><button class="button small" data-type="${esc(type.code)}" aria-label="Изменить тип ${esc(type.name)}">Изменить${icon("chevron")}</button></article>`).join("")}</section><div class="page-note">Изменение типа не пересчитывает уже обработанные звонки.</div>`;
   $("#add-type").onclick = () => openType();
   $$("[data-type]").forEach(
     (button) =>
@@ -413,7 +427,7 @@ async function loadTypes() {
 
 function openType(type = null) {
   $("#type-detail").innerHTML =
-    `<div class="dialog-heading"><h2>${type ? "Изменить тип" : "Новое обещание"}</h2><button class="button icon" data-close="type-dialog" aria-label="Закрыть">×</button></div><div class="dialog-body"><form id="type-form" class="form-grid"><label>Код<input name="code" placeholder="Например: refund" pattern="[a-z][a-z0-9_]+" minlength="2" maxlength="64" value="${esc(type?.code)}" required ${type ? "disabled" : ""}><small>Латиница, цифры и подчёркивание. Код неизменяемый.</small></label><label>Название<input name="name" value="${esc(type?.name)}" required maxlength="200" placeholder="Возврат денег"></label><label>Смысловое описание<textarea name="description" required minlength="10" maxlength="2000" placeholder="Оператор обещает оформить возврат денег клиенту…">${esc(type?.description)}</textarea></label><div class="dialog-footer">${type ? '<button class="button danger" type="button" id="delete-type">Удалить тип</button>' : "<span></span>"}<button type="submit" class="button primary">Сохранить тип</button></div></form></div>`;
+    `<div class="dialog-heading"><h2>${type ? "Изменить тип" : "Новый тип обещания"}</h2><button class="button icon" data-close="type-dialog" aria-label="Закрыть">${icon("close")}</button></div><div class="dialog-body"><form id="type-form" class="form-grid"><label>Код<input name="code" placeholder="Например: refund" pattern="[a-z][a-z0-9_]+" minlength="2" maxlength="64" value="${esc(type?.code)}" required ${type ? "disabled" : ""}><small>Латиница, цифры и подчёркивание. Код неизменяемый.</small></label><label>Название<input name="name" value="${esc(type?.name)}" required maxlength="200" placeholder="Возврат денег"></label><label>Смысловое описание<textarea name="description" required minlength="10" maxlength="2000" placeholder="Оператор обещает оформить возврат денег клиенту…">${esc(type?.description)}</textarea></label><div class="dialog-footer">${type ? '<button class="button danger" type="button" id="delete-type">Удалить тип</button>' : "<span></span>"}<button type="submit" class="button primary">Сохранить тип</button></div></form></div>`;
   $("#type-dialog").showModal();
   $("#type-form").onsubmit = (event) => {
     event.preventDefault();
@@ -455,12 +469,11 @@ async function loadNotifications() {
       : "Ожидаем соединение с Telegram";
   $("#content").innerHTML =
     heading(
-      "На связи с оператором",
       "Уведомления",
       "Новые задачи, напоминания о сроках и предложения о выполнении.",
-      '<button class="button" data-refresh>↻ Обновить</button>',
+      refreshButton(),
     ) +
-    `<div class="section-grid"><section class="panel"><div class="panel-header"><h2>Подключить Telegram</h2></div><div class="panel-body"><div class="status-banner ${telegram.connected ? "" : "offline"}"><span class="status-dot"></span><div><strong>${status}</strong><small>${telegram.username ? "@" + esc(telegram.username) : "Один сервер · без публичного вебхука"}</small></div></div>${!telegram.configured ? '<div class="note warning">Укажите TELEGRAM_BOT_TOKEN в локальном файле .env и перезапустите сервер. Токен не нужно вводить в браузере.</div>' : '<form id="telegram-form" class="form-grid inline-form"><label>ID оператора<input name="operator_id" type="number" min="1" value="7" required></label><button class="button primary" type="submit">Получить код →</button></form><div id="telegram-link"></div><p class="hint">Одноразовый код действует 10 минут. Уведомления придут в личный чат подключённого оператора.</p>'}</div></section>
+    `<div class="section-grid"><section class="panel"><div class="panel-header"><h2>Подключить Telegram</h2></div><div class="panel-body"><div class="status-banner ${telegram.connected ? "" : "offline"}"><span class="status-dot"></span><div><strong>${status}</strong><small>${telegram.username ? "@" + esc(telegram.username) : "Уведомления в личном чате оператора"}</small></div></div>${!telegram.configured ? '<div class="note warning">Укажите TELEGRAM_BOT_TOKEN в локальном файле .env и перезапустите сервер. Токен не нужно вводить в браузере.</div>' : '<form id="telegram-form" class="form-grid inline-form"><label>ID оператора<input name="operator_id" type="number" min="1" value="7" required></label><button class="button primary" type="submit">Получить код</button></form><div id="telegram-link"></div><p class="hint">Одноразовый код действует 10 минут. Уведомления придут в личный чат подключённого оператора.</p>'}</div></section>
     <section class="panel"><div class="panel-header"><h2>Подключённые операторы</h2><span class="badge">${telegram.bindings.length}</span></div><div class="panel-body">${telegram.bindings.length ? telegram.bindings.map((binding) => `<div class="binding"><span>Оператор ${binding.operator_id}<small class="hint"> · ${esc(date(binding.created_at))}</small></span><span class="badge completed">Подключён</span></div>`).join("") : "<p>Подключений пока нет. Создайте код и отправьте его боту.</p>"}<div class="spacer"></div><div class="note">В боте: /tasks — открытые задачи, /stop — отключение уведомлений. Кнопки позволяют менять статус и рассматривать подтверждения.</div></div></section></div>
     <section class="panel"><div class="panel-header"><div class="panel-title"><h2>Журнал доставки</h2><small>Повторные попытки сохраняются при перезапуске</small></div></div>${journal.items.length ? `<div class="table-scroll"><table><thead><tr><th>Событие</th><th>Задача</th><th>Оператор</th><th>Создано</th><th>Доставка</th><th>Попытки</th></tr></thead><tbody>${journal.items.map((item) => `<tr><td>${{ new: "Новая задача", reminder: "Срок приближается", overdue: "Просрочка", completion: "Подтверждение" }[item.kind]}</td><td class="task-main">${esc(item.task_title)}</td><td>${item.operator_id}</td><td>${esc(date(item.created_at))}</td><td><span class="badge ${item.status}">${{ pending: "В очереди", sent: "Отправлено", skipped: "Пропущено" }[item.status]}</span>${item.last_error ? `<small class="hint"> ${esc(item.last_error)}</small>` : ""}</td><td>${item.attempts}</td></tr>`).join("")}</tbody></table></div>` : empty("Журнал пока пуст", "Уведомления появятся после создания задач.")}</section>`;
   if (telegram.configured)
@@ -474,7 +487,7 @@ async function loadNotifications() {
           },
         });
         $("#telegram-link").innerHTML =
-          `<div class="note" style="margin-top:16px">${link.url ? "Откройте бота по ссылке и нажмите «Запустить»." : "Откройте вашего бота и отправьте эту команду:"}<input class="link-code" readonly value="/start ${esc(link.code)}" aria-label="Команда подключения"><div class="heading-actions">${link.url ? `<a href="${esc(link.url)}" target="_blank" rel="noopener" class="button primary small">Открыть Telegram ↗</a>` : ""}<button class="button small" id="copy-code" type="button">Скопировать команду</button></div></div>`;
+          `<div class="note" style="margin-top:16px">${link.url ? "Откройте бота по ссылке и нажмите «Запустить»." : "Откройте вашего бота и отправьте эту команду:"}<input class="link-code" readonly value="/start ${esc(link.code)}" aria-label="Команда подключения"><div class="heading-actions">${link.url ? `<a href="${esc(link.url)}" target="_blank" rel="noopener" class="button primary small">Открыть Telegram</a>` : ""}<button class="button small" id="copy-code" type="button">Скопировать команду</button></div></div>`;
         $("#copy-code").onclick = async () => {
           const input = $(".link-code");
           input.focus();
@@ -511,11 +524,10 @@ function exampleCall() {
 function renderCalls() {
   $("#content").innerHTML =
     heading(
-      "Входящие данные",
       "Принять звонки",
       "Проверьте сквозной сценарий или отправьте звонки вручную.",
     ) +
-    `<div class="section-grid"><section class="panel"><div class="panel-header"><h2>Массив звонков</h2><button class="button small" id="example-call">Новый пример ↻</button></div><div class="panel-body"><form id="call-form" class="form-grid"><label>JSON · от 1 до 10 звонков<textarea id="call-json" class="code-area" spellcheck="false" required>${esc(JSON.stringify(exampleCall(), null, 2))}</textarea></label><button class="button primary" type="submit" id="send-calls">Обработать через Qwen →</button></form><div id="call-result" class="call-result" aria-live="polite"></div></div></section><div><section class="panel"><div class="panel-header"><h2>Как это работает</h2></div><div class="panel-body"><div class="eyebrow">01 · Приём</div><p>Sender передаёт звонки в POST /calls. Для ручной проверки используйте форму слева.</p><div class="spacer"></div><div class="eyebrow">02 · Поиск обещаний</div><p>Qwen определяет действия и сроки. Для каждого обещания создаётся отдельная задача с исходной цитатой.</p><div class="spacer"></div><div class="eyebrow">03 · Проверка выполнения</div><p>В следующих звонках того же клиента модель ищет подтверждения. Закрытие задачи остаётся за человеком.</p></div></section><div class="note warning">Для обработки нужен запущенный Qwen. Запрос может занять одну-две минуты. Просмотр задач и работа со статусами доступны без модели.</div></div></div>`;
+    `<div class="section-grid"><section class="panel"><div class="panel-header"><h2>Массив звонков</h2><button class="button small" id="example-call">${icon("refresh")}Новый пример</button></div><div class="panel-body"><form id="call-form" class="form-grid"><label>JSON · от 1 до 10 звонков<textarea id="call-json" class="code-area" spellcheck="false" required>${esc(JSON.stringify(exampleCall(), null, 2))}</textarea></label><button class="button primary" type="submit" id="send-calls">Обработать звонки</button></form><div id="call-result" class="call-result" aria-live="polite"></div></div></section><div><section class="panel"><div class="panel-header"><h2>Как это работает</h2></div><div class="panel-body"><ol class="process-list"><li><h3>Приём расшифровок</h3><p>Sender передаёт звонки в POST /calls. Здесь можно отправить их вручную.</p></li><li><h3>Поиск обещаний</h3><p>Система выделяет действия и сроки. Каждая задача сохраняется с исходной цитатой.</p></li><li><h3>Проверка выполнения</h3><p>В следующих звонках того же клиента система ищет подтверждения. Решение о закрытии задачи принимает оператор.</p></li></ol></div></section><div class="note warning">Для обработки нужен запущенный Qwen. Запрос может занять одну-две минуты. Просмотр задач и работа со статусами доступны без модели.</div></div></div>`;
   $("#example-call").onclick = () => {
     $("#call-json").value = JSON.stringify(exampleCall(), null, 2);
   };
@@ -530,16 +542,16 @@ function renderCalls() {
       }
       const button = $("#send-calls");
       button.disabled = true;
-      button.textContent = "Qwen обрабатывает звонки…";
+      button.textContent = "Обрабатываем звонки…";
       try {
         const result = await api("/calls", { method: "POST", body: calls });
         const target = $("#call-result");
         if (target)
-          target.innerHTML = `<div class="note"><strong>Звонки обработаны</strong><br>Новых звонков: ${result.processed} · задач: ${result.tasks_created} · повторов: ${result.duplicates}<br>Предложений о выполнении: ${result.completions_suggested}${result.warnings.map((warning) => `<div class="note warning">${esc(warning)}</div>`).join("")}<div style="margin-top:12px"><button class="button small" data-goto="tasks">К задачам →</button></div></div>`;
+          target.innerHTML = `<div class="note"><strong>Звонки обработаны</strong><br>Новых звонков: ${result.processed} · задач: ${result.tasks_created} · повторов: ${result.duplicates}<br>Предложений о выполнении: ${result.completions_suggested}${result.warnings.map((warning) => `<div class="note warning">${esc(warning)}</div>`).join("")}<div style="margin-top:12px"><button class="button small" data-goto="tasks">К задачам</button></div></div>`;
         toast("Результат сохранён");
       } finally {
         button.disabled = false;
-        button.textContent = "Обработать через Qwen →";
+        button.textContent = "Обработать звонки";
       }
     });
   };
