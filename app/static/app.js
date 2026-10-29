@@ -102,6 +102,17 @@ function localValue(value) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}T${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
+function calendarDate(value) {
+  const day = new Date(value);
+  return day.toLocaleDateString("ru-RU", {
+    day: "numeric",
+    month: "short",
+    ...(day.getFullYear() !== new Date().getFullYear()
+      ? { year: "numeric" }
+      : {}),
+  });
+}
+
 const badge = (status) =>
   `<span class="badge ${esc(status)}">${esc(labels[status] || status)}</span>`;
 const typeName = (code) =>
@@ -214,7 +225,7 @@ async function loadTasks() {
       ) => `<tr class="task-row" data-task="${esc(task.id)}" tabindex="0" aria-label="Открыть задачу: ${esc(task.title)}">
     <td class="task-main"><strong>${esc(task.title)}</strong><small>${esc(typeName(task.type_code))}${suggestions.some((s) => s.task_id === task.id) ? '<span class="evidence-dot">Проверить выполнение</span>' : ""}</small></td>
     <td class="mono">${esc(task.client_phone)}</td><td><span class="operator-chip">Оператор <b>${task.operator_id}</b></span></td>
-    <td><span class="deadline-date ${task.status === "overdue" ? "deadline-late" : ""}">${esc(new Date(task.due_at).toLocaleDateString("ru-RU", { day: "numeric", month: "short", ...(new Date(task.due_at).getFullYear() !== new Date().getFullYear() ? { year: "numeric" } : {}) }))}<span class="deadline-hour">${esc(date(task.due_at, true))}</span></span><span class="deadline-time">${task.deadline_source === "default_24h" ? "24 часа по умолчанию" : task.deadline_source === "manual" ? "Уточнён вручную" : "Из разговора"}</span></td>
+    <td><span class="deadline-date ${task.status === "overdue" ? "deadline-late" : ""}">${esc(calendarDate(task.due_at))}<span class="deadline-hour">${esc(date(task.due_at, true))}</span></span><span class="deadline-time">${task.deadline_source === "default_24h" ? "24 часа по умолчанию" : task.deadline_source === "manual" ? "Уточнён вручную" : "Из разговора"}</span></td>
     <td>${badge(task.status)}</td><td class="row-chevron">${icon("chevron")}</td></tr>`,
     )
     .join("");
@@ -474,7 +485,7 @@ async function loadNotifications() {
       refreshButton(),
     ) +
     `<div class="section-grid"><section class="panel"><div class="panel-header"><h2>Подключить Telegram</h2></div><div class="panel-body"><div class="status-banner ${telegram.connected ? "" : "offline"}"><span class="status-dot"></span><div><strong>${status}</strong><small>${telegram.username ? "@" + esc(telegram.username) : "Уведомления в личном чате оператора"}</small></div></div>${!telegram.configured ? '<div class="note warning">Укажите TELEGRAM_BOT_TOKEN в локальном файле .env и перезапустите сервер. Токен не нужно вводить в браузере.</div>' : '<form id="telegram-form" class="form-grid inline-form"><label>ID оператора<input name="operator_id" type="number" min="1" value="7" required></label><button class="button primary" type="submit">Получить код</button></form><div id="telegram-link"></div><p class="hint">Одноразовый код действует 10 минут. Уведомления придут в личный чат подключённого оператора.</p>'}</div></section>
-    <section class="panel"><div class="panel-header"><h2>Подключённые операторы</h2><span class="badge">${telegram.bindings.length}</span></div><div class="panel-body">${telegram.bindings.length ? telegram.bindings.map((binding) => `<div class="binding"><span>Оператор ${binding.operator_id}<small class="hint"> · ${esc(date(binding.created_at))}</small></span><span class="badge completed">Подключён</span></div>`).join("") : "<p>Подключений пока нет. Создайте код и отправьте его боту.</p>"}<div class="spacer"></div><div class="note">В боте: /tasks — открытые задачи, /stop — отключение уведомлений. Кнопки позволяют менять статус и рассматривать подтверждения.</div></div></section></div>
+    <section class="panel"><div class="panel-header"><h2>Подключённые операторы</h2><span class="record-count">${telegram.bindings.length}</span></div><div class="panel-body">${telegram.bindings.length ? telegram.bindings.map((binding) => `<div class="binding"><span>Оператор ${binding.operator_id}<small class="hint"> · ${esc(date(binding.created_at))}</small></span><span class="badge completed">Подключён</span></div>`).join("") : "<p>Подключений пока нет. Создайте код и отправьте его боту.</p>"}<div class="spacer"></div><div class="note">В боте: /tasks — открытые задачи, /stop — отключение уведомлений. Кнопки позволяют менять статус и рассматривать подтверждения.</div></div></section></div>
     <section class="panel"><div class="panel-header"><div class="panel-title"><h2>Журнал доставки</h2><small>Повторные попытки сохраняются при перезапуске</small></div></div>${journal.items.length ? `<div class="table-scroll"><table><thead><tr><th>Событие</th><th>Задача</th><th>Оператор</th><th>Создано</th><th>Доставка</th><th>Попытки</th></tr></thead><tbody>${journal.items.map((item) => `<tr><td>${{ new: "Новая задача", reminder: "Срок приближается", overdue: "Просрочка", completion: "Подтверждение" }[item.kind]}</td><td class="task-main">${esc(item.task_title)}</td><td>${item.operator_id}</td><td>${esc(date(item.created_at))}</td><td><span class="badge ${item.status}">${{ pending: "В очереди", sent: "Отправлено", skipped: "Пропущено" }[item.status]}</span>${item.last_error ? `<small class="hint"> ${esc(item.last_error)}</small>` : ""}</td><td>${item.attempts}</td></tr>`).join("")}</tbody></table></div>` : empty("Журнал пока пуст", "Уведомления появятся после создания задач.")}</section>`;
   if (telegram.configured)
     $("#telegram-form").onsubmit = (event) => {
