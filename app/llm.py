@@ -95,7 +95,7 @@ class QwenExtractor:
         except httpx.TimeoutException as error:
             raise LLMError("LM Studio timed out; retry the webhook") from error
         except httpx.HTTPStatusError as error:
-            raise LLMError(f"LM Studio returned HTTP {error.response.status_code}") from error
+            raise LLMError(f"LLM request returned HTTP {error.response.status_code}") from error
         except httpx.RequestError as error:
             raise LLMError("Cannot connect to LM Studio") from error
         except (ValueError, TypeError, KeyError, IndexError, AttributeError) as error:
