@@ -38,14 +38,19 @@ RELATIVE = re.compile(
 
 def resolve_deadline(promise: ExtractedPromise, ended_at: datetime) -> tuple[datetime, str]:
     """Return an aware deadline and its source. Unknown means exactly +24 hours."""
-    text = (promise.deadline_text or "").lower().replace("ё", "е")
-    if not text or re.search(
-        r"^(?:скоро|позже|когда\b|как только\b|при .*возможност|на днях)", text
+    text = (promise.deadline_text or "").lower().replace("ё", "е").strip(" .,!;")
+    has_upper_bound = "не позже" in text or "не позднее" in text
+    if (
+        not text
+        or re.search(r"^(?:скоро|позже|когда\b|как только\b|при .*возможност|на днях)", text)
+        and not has_upper_bound
     ):
         return ended_at + timedelta(hours=24), "default_24h"
-    if "через полчаса" in text or "в течение получаса" in text:
+    if text in {"через полчаса", "в течение получаса"}:
         return ended_at + timedelta(minutes=30), "explicit"
-    if match := RELATIVE.search(text):
+    # Only a complete relative phrase is safe to compute without losing a clock
+    # time or a condition such as "через два дня после согласования".
+    if match := RELATIVE.fullmatch(text):
         amount_text, unit = match.groups()
         amount = NUMBERS.get(amount_text)
         if amount is None:
