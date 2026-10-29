@@ -1,5 +1,3 @@
-"""Find evidence in subsequent calls; a human makes the final decision."""
-
 from starlette.concurrency import run_in_threadpool
 
 from app.llm import LLMError, QwenExtractor

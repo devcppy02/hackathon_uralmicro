@@ -254,7 +254,7 @@ def test_unused_type_is_not_saved_for_duplicate_call(storage, call, extraction):
 def test_concurrent_webhooks_see_latest_catalog(tmp_path, call_json, auto_extraction):
     class Extractor:
         async def extract(self, calls, types):
-            # Make simultaneous requests overlap without the auto-typing lock.
+            # Даём запросам пересечься: без блокировки оба увидели бы старый справочник.
             await asyncio.sleep(0.05)
             known = ESCALATION in types
             return AutoTypeExtraction(

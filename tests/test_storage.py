@@ -48,7 +48,6 @@ def test_atomic_rollback(storage, call, extraction):
     good = call.model_copy(update={"id": "good"})
     unknown_type = extraction.model_copy(deep=True)
     unknown_type.calls[0].promises[0].type_code = "deleted_type"
-    # First call succeeds within the transaction; second fails its foreign key.
     data = Extraction(calls=[{"call_id": "good", "promises": []}, unknown_type.calls[0]])
     with pytest.raises(ConflictError, match="types changed"):
         storage.save_calls([good, call], data)

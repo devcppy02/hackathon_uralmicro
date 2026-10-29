@@ -46,7 +46,7 @@ def create_app(
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         storage.initialize()
-        # A local model must be reached directly, not through machine-wide proxies.
+        # Системный прокси может перехватить запрос к локальной модели и вернуть 403.
         async with httpx.AsyncClient(trust_env=False) as client:
             app.state.extractor = extractor or QwenExtractor(client, settings)
             app.state.checker = completion_checker or CompletionChecker(
@@ -110,7 +110,7 @@ def create_app(
 
     @app.post("/calls", response_model=CallsResult, tags=["Звонки"])
     async def receive_calls(calls: CallBatch):
-        # Auto typing must see categories committed by the previous webhook.
+        # Следующий запрос должен видеть типы, сохранённые предыдущим запросом.
         async with auto_type_lock if settings.auto_create_promise_types else nullcontext():
             new_calls = await run_in_threadpool(storage.new_calls, calls)
             types = await run_in_threadpool(storage.list_types)
@@ -126,7 +126,7 @@ def create_app(
         try:
             result.completions_suggested = await app.state.checker.check(calls)
         except LLMError as error:
-            # Main tasks are already committed. Retrying the same IDs checks evidence again.
+            # Задачи уже сохранены; повтор запроса с теми же ID заново проверит выполнение.
             result.warnings.append(
                 "Задачи сохранены, проверка выполнения не завершена: " + str(error)
             )

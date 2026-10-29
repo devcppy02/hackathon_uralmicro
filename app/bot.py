@@ -1,5 +1,3 @@
-"""Small aiogram bot, running inside the FastAPI process by long polling."""
-
 import asyncio
 import logging
 from html import escape
