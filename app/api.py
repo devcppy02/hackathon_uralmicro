@@ -1,31 +1,45 @@
+import asyncio
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Annotated
 
 import httpx
 from fastapi import FastAPI, HTTPException, Query, Response
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import AwareDatetime
 from starlette.concurrency import run_in_threadpool
 
+from app.bot import TelegramService
+from app.completion import CompletionChecker
 from app.config import Settings
 from app.llm import LLMError, QwenExtractor
 from app.models import (
     CallBatch,
     CallsResult,
+    CompletionDecision,
     Extraction,
     PromiseType,
     PromiseTypeUpdate,
     Task,
+    TaskCorrection,
     TaskPage,
     TaskStatus,
     TaskUpdate,
+    TelegramLink,
 )
+from app.notifications import Notifications
 from app.storage import ConflictError, Storage
+from app.workflow import Workflow
 
 
-def create_app(settings: Settings | None = None, extractor=None) -> FastAPI:
+def create_app(
+    settings: Settings | None = None, extractor=None, completion_checker=None, start_bot=True
+) -> FastAPI:
     settings = settings or Settings()
     storage = Storage(settings.database_path)
+    workflow, notifications = Workflow(storage), Notifications(storage)
+    telegram = TelegramService(settings, storage, workflow, notifications)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -33,9 +47,28 @@ def create_app(settings: Settings | None = None, extractor=None) -> FastAPI:
         # A local model must be reached directly, not through machine-wide proxies.
         async with httpx.AsyncClient(trust_env=False) as client:
             app.state.extractor = extractor or QwenExtractor(client, settings)
-            yield
+            app.state.checker = completion_checker or CompletionChecker(
+                QwenExtractor(client, settings), workflow
+            )
+            worker = None
+            if start_bot and settings.telegram_bot_token.get_secret_value():
+                worker = asyncio.create_task(telegram.run())
+            try:
+                yield
+            finally:
+                if worker:
+                    worker.cancel()
+                    await asyncio.gather(worker, return_exceptions=True)
 
     app = FastAPI(title="УралМикро · Контроль обещаний", version="0.1.0", lifespan=lifespan)
+    app.state.telegram = telegram
+    app.state.storage = storage
+    static = Path(__file__).parent / "static"
+    app.mount("/static", StaticFiles(directory=static), name="static")
+
+    @app.get("/", include_in_schema=False)
+    def interface():
+        return FileResponse(static / "index.html")
 
     @app.exception_handler(ConflictError)
     async def conflict_handler(request, error):
@@ -82,7 +115,16 @@ def create_app(settings: Settings | None = None, extractor=None) -> FastAPI:
             if new_calls
             else Extraction(calls=[])
         )
-        return await run_in_threadpool(storage.save_calls, calls, extracted)
+        result = await run_in_threadpool(storage.save_calls, calls, extracted)
+        try:
+            result.completions_suggested = await app.state.checker.check(calls)
+        except LLMError as error:
+            # Main tasks are already committed. Retrying the same IDs checks evidence again.
+            result.warnings.append(
+                "Задачи сохранены, проверка выполнения не завершена: " + str(error)
+            )
+        await run_in_threadpool(notifications.prepare, settings.reminder_minutes)
+        return result
 
     @app.get("/tasks", response_model=TaskPage, tags=["Задачи"])
     def list_tasks(
@@ -106,9 +148,72 @@ def create_app(settings: Settings | None = None, extractor=None) -> FastAPI:
 
     @app.patch("/tasks/{task_id}", response_model=Task, tags=["Задачи"])
     def update_task(task_id: str, item: TaskUpdate):
-        updated = storage.update_task(task_id, item.status)
+        updated = storage.update_task(task_id, item.status, item.actor, item.reason)
         if updated is None:
             raise HTTPException(404, "Task not found")
         return updated
+
+    @app.get("/tasks/{task_id}", response_model=Task, tags=["Задачи"])
+    def get_task(task_id: str):
+        task = storage.get_task(task_id)
+        if task is None:
+            raise HTTPException(404, "Task not found")
+        return task
+
+    @app.patch("/tasks/{task_id}/details", response_model=Task, tags=["Задачи"])
+    def correct_task(task_id: str, item: TaskCorrection):
+        task = workflow.correct(task_id, item)
+        if task is None:
+            raise HTTPException(404, "Task not found")
+        return task
+
+    @app.get("/tasks/{task_id}/history", tags=["Задачи"])
+    def task_history(task_id: str):
+        if storage.get_task(task_id) is None:
+            raise HTTPException(404, "Task not found")
+        return workflow.history(task_id)
+
+    @app.get("/summary", tags=["Сводка"])
+    def summary(operator_id: Annotated[int | None, Query(gt=0)] = None):
+        return workflow.summary(operator_id)
+
+    @app.get("/completion-suggestions", tags=["Подтверждения"])
+    def suggestions(
+        operator_id: Annotated[int | None, Query(gt=0)] = None,
+        status: Annotated[str, Query(pattern="^(pending|accepted|rejected|obsolete)$")] = "pending",
+    ):
+        return workflow.suggestions(operator_id, status)
+
+    @app.post("/completion-suggestions/{suggestion_id}/review", tags=["Подтверждения"])
+    def review_suggestion(suggestion_id: str, decision: CompletionDecision):
+        result = workflow.review(suggestion_id, decision)
+        if result is None:
+            raise HTTPException(404, "Suggestion not found")
+        return result
+
+    @app.get("/telegram/status", tags=["Уведомления"])
+    def telegram_status():
+        return telegram.status()
+
+    @app.post("/telegram/link", tags=["Уведомления"])
+    def telegram_link(item: TelegramLink):
+        if not settings.telegram_bot_token.get_secret_value():
+            raise HTTPException(503, "Configure TELEGRAM_BOT_TOKEN in .env")
+        result = notifications.create_link(item.operator_id)
+        result["url"] = (
+            f"https://t.me/{telegram.username}?start={result['code']}"
+            if telegram.username
+            else None
+        )
+        return result
+
+    @app.get("/notifications", tags=["Уведомления"])
+    def notification_journal(
+        operator_id: Annotated[int | None, Query(gt=0)] = None,
+        limit: Annotated[int, Query(ge=1, le=500)] = 100,
+        offset: Annotated[int, Query(ge=0)] = 0,
+    ):
+        notifications.prepare(settings.reminder_minutes)
+        return notifications.journal(operator_id, limit, offset)
 
     return app

@@ -11,3 +11,5 @@ data/
 *.sqlite3*
 dist/
 *.egg-info/
+DEFENSE.md
+DEFENCE.md

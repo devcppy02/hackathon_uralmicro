@@ -59,6 +59,12 @@ class QwenExtractor:
                 for call in calls
             ],
         }
+        result = await self.request(Extraction, SYSTEM_PROMPT, data)
+        self.validate(result, calls, types)
+        return result
+
+    async def request(self, schema, prompt, data):
+        """Shared structured-output transport for extraction and completion evidence."""
         try:
             response = await self.client.post(
                 self.settings.llm_base_url + "/chat/completions",
@@ -70,15 +76,15 @@ class QwenExtractor:
                     "max_tokens": self.settings.llm_max_tokens,
                     "chat_template_kwargs": {"enable_thinking": False},
                     "messages": [
-                        {"role": "system", "content": SYSTEM_PROMPT},
+                        {"role": "system", "content": prompt},
                         {"role": "user", "content": json.dumps(data, ensure_ascii=False)},
                     ],
                     "response_format": {
                         "type": "json_schema",
                         "json_schema": {
-                            "name": "call_promises",
+                            "name": schema.__name__,
                             "strict": True,
-                            "schema": Extraction.model_json_schema(),
+                            "schema": schema.model_json_schema(),
                         },
                     },
                 },
@@ -91,7 +97,7 @@ class QwenExtractor:
             message = choice["message"]
             # Some Qwen/LM Studio versions put the entire JSON in reasoning_content.
             content = message.get("content") or message.get("reasoning_content")
-            result = Extraction.model_validate_json(content)
+            result = schema.model_validate_json(content)
         except httpx.TimeoutException as error:
             raise LLMError("LM Studio timed out; retry the webhook") from error
         except httpx.HTTPStatusError as error:
@@ -100,7 +106,6 @@ class QwenExtractor:
             raise LLMError("Cannot connect to LM Studio") from error
         except (ValueError, TypeError, KeyError, IndexError, AttributeError) as error:
             raise LLMError("LM Studio returned an invalid response") from error
-        self.validate(result, calls, types)
         return result
 
     @staticmethod

@@ -80,6 +80,8 @@ class TaskStatus(StrEnum):
 
 class TaskUpdate(StrictModel):
     status: Literal[TaskStatus.IN_PROGRESS, TaskStatus.COMPLETED]
+    actor: str = Field(default="operator", min_length=1, max_length=100)
+    reason: str = Field(default="", max_length=1000)
 
 
 class Task(StrictModel):
@@ -92,12 +94,13 @@ class Task(StrictModel):
     quote: str
     replica_index: int
     deadline_text: str | None
-    deadline_source: Literal["explicit", "default_24h"]
+    deadline_source: Literal["explicit", "default_24h", "manual"]
     due_at: AwareDatetime
     status: TaskStatus
     created_at: AwareDatetime
     updated_at: AwareDatetime
     completed_at: AwareDatetime | None
+    revision: int = 0
 
 
 class TaskPage(StrictModel):
@@ -112,6 +115,8 @@ class CallsResult(StrictModel):
     duplicates: int
     tasks_created: int
     tasks: list[Task]
+    completions_suggested: int = 0
+    warnings: list[str] = Field(default_factory=list)
 
 
 class ExtractedPromise(StrictModel):
@@ -130,3 +135,44 @@ class CallExtraction(StrictModel):
 
 class Extraction(StrictModel):
     calls: list[CallExtraction] = Field(max_length=10)
+
+
+class TaskCorrection(StrictModel):
+    title: str | None = Field(default=None, min_length=1, max_length=500)
+    type_code: str | None = Field(default=None, pattern=r"^[a-z][a-z0-9_]+$")
+    due_at: AwareDatetime | None = None
+    reason: str = Field(min_length=3, max_length=1000)
+    actor: str = Field(default="operator", min_length=1, max_length=100)
+
+    @model_validator(mode="after")
+    def has_changes(self) -> "TaskCorrection":
+        if self.title is None and self.type_code is None and self.due_at is None:
+            raise ValueError("Provide title, type_code or due_at")
+        return self
+
+
+class CompletionEvidence(StrictModel):
+    task_id: str
+    call_id: str
+    quote: str = Field(min_length=1, max_length=10000)
+    replica_index: int = Field(ge=0, strict=True)
+    explanation: str = Field(min_length=1, max_length=1000)
+
+
+class CompletionExtraction(StrictModel):
+    confirmations: list[CompletionEvidence] = Field(max_length=100)
+
+
+class CompletionDecision(StrictModel):
+    accept: bool
+    actor: str = Field(default="operator", min_length=1, max_length=100)
+    reason: str = Field(default="", max_length=1000)
+
+
+class TelegramLink(StrictModel):
+    operator_id: int = Field(gt=0, strict=True)
+
+
+def phone_key(phone: str) -> str:
+    digits = "".join(char for char in phone if char.isdigit())
+    return "7" + digits[1:] if len(digits) == 11 and digits.startswith("8") else digits

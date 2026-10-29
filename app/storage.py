@@ -9,6 +9,7 @@ from pathlib import Path
 from uuid import NAMESPACE_URL, uuid5
 
 from app.deadlines import resolve_deadline
+from app.migrations import migrate
 from app.models import (
     CallInput,
     CallsResult,
@@ -18,9 +19,11 @@ from app.models import (
     Task,
     TaskPage,
     TaskStatus,
+    phone_key,
     timestamp,
     utcnow,
 )
+from app.workflow import record_event
 
 DEFAULT_TYPES = [
     PromiseType(
@@ -52,11 +55,19 @@ def fingerprint(call: CallInput) -> str:
 
 
 def expire_tasks(db: sqlite3.Connection, now: datetime) -> None:
-    db.execute(
-        "UPDATE tasks SET status='overdue', updated_at=? "
-        "WHERE status IN ('created','in_progress') AND due_at < ?",
-        (timestamp(now), timestamp(now)),
-    )
+    if not db.in_transaction:
+        db.execute("BEGIN IMMEDIATE")
+    rows = db.execute(
+        "SELECT * FROM tasks WHERE status IN ('created','in_progress') AND due_at < ?",
+        (timestamp(now),),
+    ).fetchall()
+    for before in rows:
+        db.execute(
+            "UPDATE tasks SET status='overdue',updated_at=? WHERE id=?",
+            (timestamp(now), before["id"]),
+        )
+        after = db.execute("SELECT * FROM tasks WHERE id=?", (before["id"],)).fetchone()
+        record_event(db, before, after, "overdue", "system", "Истёк срок задачи")
 
 
 class Storage:
@@ -103,6 +114,7 @@ class Storage:
                     [item.model_dump() for item in DEFAULT_TYPES],
                 )
                 db.execute("PRAGMA user_version=1")
+            migrate(db)
 
     def list_types(self) -> list[PromiseType]:
         with self.connect() as db:
@@ -172,7 +184,17 @@ class Storage:
                     if row[0] != digest:
                         raise ConflictError(f"Call {call.id} already has different content")
                     continue
-                db.execute("INSERT INTO calls VALUES (?,?)", (call.id, digest))
+                db.execute(
+                    "INSERT INTO calls(id,fingerprint,payload,ended_at,client_phone) "
+                    "VALUES (?,?,?,?,?)",
+                    (
+                        call.id,
+                        digest,
+                        call.model_dump_json(),
+                        timestamp(call.ended_at),
+                        phone_key(call.client_phone),
+                    ),
+                )
                 processed += 1
                 new_ids.add(call.id)
                 for promise in promises[call.id]:
@@ -200,14 +222,16 @@ class Storage:
                     for name in ("due_at", "created_at", "updated_at"):
                         values[name] = timestamp(getattr(task, name))
                     try:
-                        db.execute(
+                        inserted = db.execute(
                             "INSERT INTO tasks ("
                             + ",".join(values)
                             + ") VALUES ("
                             + ",".join(f":{name}" for name in values)
                             + ") ON CONFLICT(id) DO NOTHING",
                             values,
-                        )
+                        ).rowcount
+                        if inserted:
+                            record_event(db, None, values, "created", "qwen")
                     except sqlite3.IntegrityError as error:
                         raise ConflictError("Promise types changed; retry the webhook") from error
             expire_tasks(db, now)
@@ -259,7 +283,15 @@ class Storage:
             items=[Task(**dict(row)) for row in rows], total=total, limit=limit, offset=offset
         )
 
-    def update_task(self, task_id: str, status: TaskStatus) -> Task | None:
+    def get_task(self, task_id: str) -> Task | None:
+        with self.connect() as db:
+            expire_tasks(db, utcnow())
+            row = db.execute("SELECT * FROM tasks WHERE id=?", (task_id,)).fetchone()
+            return Task(**dict(row)) if row else None
+
+    def update_task(
+        self, task_id: str, status: TaskStatus, actor: str = "operator", reason: str = ""
+    ) -> Task | None:
         now = utcnow()
         with self.connect() as db:
             expire_tasks(db, now)
@@ -275,6 +307,7 @@ class Storage:
             if status != row["status"] and status not in allowed[row["status"]]:
                 raise ConflictError(f"Cannot change status from {row['status']} to {status}")
             if status != row["status"]:
+                before = row
                 db.execute(
                     "UPDATE tasks SET status=?, updated_at=?, completed_at=? WHERE id=?",
                     (
@@ -284,5 +317,13 @@ class Storage:
                         task_id,
                     ),
                 )
+                after = db.execute("SELECT * FROM tasks WHERE id=?", (task_id,)).fetchone()
+                record_event(db, before, after, "status_changed", actor, reason)
+                if status == "completed":
+                    db.execute(
+                        "UPDATE completion_suggestions SET status='obsolete' "
+                        "WHERE task_id=? AND status='pending'",
+                        (task_id,),
+                    )
             row = db.execute("SELECT * FROM tasks WHERE id=?", (task_id,)).fetchone()
         return Task(**dict(row))
