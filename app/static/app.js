@@ -225,7 +225,7 @@ async function loadTasks() {
     <div class="filter-end"><button class="button" type="submit">Применить</button><button class="button" type="button" id="reset-filters">Сбросить</button></div></form>
     ${
       rows
-        ? `<div class="table-scroll"><table><thead><tr><th>Обещание</th><th>Клиент</th><th>Ответственный</th><th>Срок выполнения</th><th>Статус</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`
+        ? `<div class="table-scroll"><table class="task-table"><thead><tr><th>Обещание</th><th>Клиент</th><th>Ответственный</th><th>Срок выполнения</th><th>Статус</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`
         : empty(
             "Задач пока нет",
             "Измените фильтры или примите первый звонок. Найденные обещания появятся здесь.",

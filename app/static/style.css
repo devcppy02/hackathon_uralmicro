@@ -1401,3 +1401,62 @@ dialog[open] {
     display: none;
   }
 }
+@media (max-width: 900px) {
+  .task-table,
+  .task-table tbody {
+    display: block;
+    width: 100%;
+  }
+  .task-table thead {
+    display: none;
+  }
+  .task-table .task-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "main status" "phone due" "operator due";
+    gap: 7px 14px;
+    padding: 18px 20px;
+    border-bottom: 1px solid var(--line);
+  }
+  .task-table .task-row:last-child {
+    border-bottom: 0;
+  }
+  .task-table td {
+    padding: 0;
+    border: 0;
+  }
+  .task-table .task-main {
+    grid-area: main;
+    min-width: 0;
+    max-width: none;
+  }
+  .task-table .task-main strong {
+    margin-bottom: 3px;
+  }
+  .task-table td:nth-child(2) {
+    grid-area: phone;
+    font-size: 11px;
+    margin-top: 4px;
+  }
+  .task-table td:nth-child(3) {
+    grid-area: operator;
+  }
+  .task-table td:nth-child(4) {
+    grid-area: due;
+    text-align: right;
+    align-self: end;
+  }
+  .task-table td:nth-child(5) {
+    grid-area: status;
+    align-self: start;
+  }
+  .task-table td:nth-child(6) {
+    display: none;
+  }
+  .task-table .task-row:hover {
+    background: #f7faf2;
+  }
+  .task-table .task-row:hover td {
+    background: none;
+  }
+}
