@@ -1,5 +1,5 @@
 import asyncio
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, nullcontext
 from pathlib import Path
 from typing import Annotated
 
@@ -15,6 +15,7 @@ from app.completion import CompletionChecker
 from app.config import Settings
 from app.llm import LLMError, QwenExtractor
 from app.models import (
+    AutoTypeExtraction,
     CallBatch,
     CallsResult,
     CompletionDecision,
@@ -40,6 +41,7 @@ def create_app(
     storage = Storage(settings.database_path)
     workflow, notifications = Workflow(storage), Notifications(storage)
     telegram = TelegramService(settings, storage, workflow, notifications)
+    auto_type_lock = asyncio.Lock()
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -108,14 +110,19 @@ def create_app(
 
     @app.post("/calls", response_model=CallsResult, tags=["Звонки"])
     async def receive_calls(calls: CallBatch):
-        new_calls = await run_in_threadpool(storage.new_calls, calls)
-        types = await run_in_threadpool(storage.list_types)
-        extracted = (
-            await app.state.extractor.extract(new_calls, types)
-            if new_calls
-            else Extraction(calls=[])
-        )
-        result = await run_in_threadpool(storage.save_calls, calls, extracted)
+        # Auto typing must see categories committed by the previous webhook.
+        async with auto_type_lock if settings.auto_create_promise_types else nullcontext():
+            new_calls = await run_in_threadpool(storage.new_calls, calls)
+            types = await run_in_threadpool(storage.list_types)
+            extracted = (
+                await app.state.extractor.extract(new_calls, types)
+                if new_calls
+                else Extraction(calls=[])
+            )
+            new_types = extracted.new_types if isinstance(extracted, AutoTypeExtraction) else []
+            if new_types and not settings.auto_create_promise_types:
+                raise LLMError("Automatic promise type creation is disabled")
+            result = await run_in_threadpool(storage.save_calls, calls, extracted, new_types)
         try:
             result.completions_suggested = await app.state.checker.check(calls)
         except LLMError as error:

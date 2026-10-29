@@ -169,8 +169,15 @@ class Storage:
                 seen[call.id] = digest
         return result
 
-    def save_calls(self, calls: list[CallInput], extraction: Extraction) -> CallsResult:
+    def save_calls(
+        self,
+        calls: list[CallInput],
+        extraction: Extraction,
+        new_types: list[PromiseType] | None = None,
+    ) -> CallsResult:
         promises = {item.call_id: item.promises for item in extraction.calls}
+        proposed = {item.code: item for item in new_types or []}
+        types_created = []
         new_ids = set()
         processed = 0
         now = utcnow()
@@ -198,6 +205,19 @@ class Storage:
                 processed += 1
                 new_ids.add(call.id)
                 for promise in promises[call.id]:
+                    new_type = proposed.pop(promise.type_code, None)
+                    if new_type is not None:
+                        existing = db.execute(
+                            "SELECT * FROM promise_types WHERE code=?", (new_type.code,)
+                        ).fetchone()
+                        if existing and dict(existing) != new_type.model_dump():
+                            raise ConflictError("Promise types changed; retry the webhook")
+                        if not existing:
+                            db.execute(
+                                "INSERT INTO promise_types VALUES (:code,:name,:description)",
+                                new_type.model_dump(),
+                            )
+                            types_created.append(new_type)
                     key = f"{call.id}:{promise.type_code}:{promise.replica_index}:"
                     key += " ".join(promise.quote.casefold().split())
                     due_at, source = resolve_deadline(promise, call.ended_at)
@@ -249,6 +269,7 @@ class Storage:
             duplicates=len(calls) - processed,
             tasks_created=count,
             tasks=created,
+            types_created=types_created,
         )
 
     def list_tasks(

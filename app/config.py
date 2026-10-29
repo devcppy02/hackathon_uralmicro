@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     llm_api_key: SecretStr = SecretStr("lm-studio")
     llm_timeout_seconds: float = Field(default=120, gt=0, le=600)
     llm_max_tokens: int = Field(default=4096, ge=256, le=32768)
+    auto_create_promise_types: bool = False
     telegram_bot_token: SecretStr = SecretStr("")
     notification_poll_seconds: float = Field(default=15, gt=0)
     reminder_minutes: int = Field(default=30, ge=1, le=1440)

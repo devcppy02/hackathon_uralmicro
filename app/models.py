@@ -115,6 +115,7 @@ class CallsResult(StrictModel):
     duplicates: int
     tasks_created: int
     tasks: list[Task]
+    types_created: list[PromiseType] = Field(default_factory=list)
     completions_suggested: int = 0
     warnings: list[str] = Field(default_factory=list)
 
@@ -135,6 +136,14 @@ class CallExtraction(StrictModel):
 
 class Extraction(StrictModel):
     calls: list[CallExtraction] = Field(max_length=10)
+
+
+class AutoTypeExtraction(Extraction):
+    new_types: list[PromiseType] = Field(max_length=50)
+
+
+class TypeMatch(StrictModel):
+    existing_type_code: str | None
 
 
 class TaskCorrection(StrictModel):
