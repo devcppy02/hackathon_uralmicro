@@ -14,6 +14,8 @@ NOW = datetime.fromisoformat("2026-10-29T10:05:00+05:00")
 @pytest.fixture(autouse=True)
 def fixed_clock(monkeypatch):
     monkeypatch.setattr("app.storage.utcnow", lambda: NOW)
+    monkeypatch.setattr("app.workflow.utcnow", lambda: NOW)
+    monkeypatch.setattr("app.notifications.utcnow", lambda: NOW)
 
 
 @pytest.fixture

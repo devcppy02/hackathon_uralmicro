@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>УралМикро — контроль обещаний</title><link rel="stylesheet" href="/static/style.css"><script src="/static/app.js" defer></script></head>
+<body><aside class="sidebar"><a class="brand" href="/"><span class="brand-mark">у<span>м</span></span><span>УралМикро<small>РАБОЧЕЕ ПРОСТРАНСТВО</small></span></a>
+<div class="workspace-label">КОНТАКТ-ЦЕНТР</div><nav id="navigation">
+<button data-view="tasks" class="nav-item active"><span>▤</span>Задачи<span id="nav-task-count" class="nav-count">0</span></button>
+<button data-view="summary" class="nav-item"><span>▥</span>Сводка</button>
+<button data-view="types" class="nav-item"><span>◇</span>Типы обещаний</button>
+<button data-view="notifications" class="nav-item"><span>♧</span>Уведомления</button>
+<button data-view="calls" class="nav-item"><span>↙</span>Приём звонков</button></nav>
+<div class="sidebar-bottom"><div class="status-dot"></div><span>Локальное приложение<small>FastAPI · SQLite · Qwen</small></span></div></aside>
+<main><header class="topbar"><span class="breadcrumb">Рабочее пространство <span>/</span> <b id="breadcrumb">Задачи</b></span><div class="topbar-right"><a href="/docs" target="_blank" rel="noopener">API <span>↗</span></a><span class="avatar">ОП</span></div></header>
+<div id="content" class="content"><p>Загружаем рабочее пространство…</p></div></main>
+<dialog id="task-dialog"><div id="task-detail"></div></dialog><dialog id="type-dialog"><div id="type-detail"></div></dialog>
+<div id="toast" class="toast" role="status" aria-live="polite"></div></body></html>
