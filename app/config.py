@@ -15,12 +15,6 @@ class Settings(BaseSettings):
     llm_api_key: SecretStr = SecretStr("lm-studio")
     llm_timeout_seconds: float = Field(default=120, gt=0, le=600)
     llm_max_tokens: int = Field(default=4096, ge=256, le=32768)
-    worker_poll_seconds: float = Field(default=1, gt=0)
-    max_processing_attempts: int = Field(default=3, ge=1, le=10)
-    retry_base_seconds: float = Field(default=10, gt=0)
-    overdue_poll_seconds: float = Field(default=15, gt=0)
-    api_token: SecretStr = SecretStr("")
-    webhook_token: SecretStr = SecretStr("")
 
     @field_validator("app_timezone")
     @classmethod

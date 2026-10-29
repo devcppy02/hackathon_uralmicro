@@ -16,7 +16,9 @@ def test_base_url_normalization(url):
     assert Settings(_env_file=None, llm_base_url=url).llm_base_url == "http://localhost:1234/v1"
 
 
-@pytest.mark.parametrize("url", ["file:///tmp", "bad", "http://x?a=1", "http://a:b@x", "http://x#f"])
+@pytest.mark.parametrize(
+    "url", ["file:///tmp", "bad", "http://x?a=1", "http://a:b@x", "http://x#f"]
+)
 def test_invalid_base_url(url):
     with pytest.raises(ValidationError):
         Settings(_env_file=None, llm_base_url=url)
