@@ -8,7 +8,20 @@ from app.models import CallInput, Replica
 def test_default_settings():
     settings = Settings(_env_file=None)
     assert settings.llm_model == "qwen/qwen3.8-27b"
+    assert settings.auto_create_promise_types is False
     assert "lm-studio" not in repr(settings.llm_api_key)
+
+
+@pytest.mark.parametrize("value, expected", [("true", True), ("false", False)])
+def test_auto_types_from_env_file(tmp_path, value, expected):
+    env_file = tmp_path / ".env"
+    env_file.write_text(f"AUTO_CREATE_PROMISE_TYPES={value}\n", encoding="utf-8")
+    assert Settings(_env_file=env_file).auto_create_promise_types is expected
+
+
+def test_invalid_auto_types_setting():
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None, auto_create_promise_types="sometimes")
 
 
 @pytest.mark.parametrize("url", ["http://localhost:1234", "http://localhost:1234/v1/"])

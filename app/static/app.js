@@ -165,7 +165,7 @@ async function loadTasks() {
     offset: state.offset,
     ...state.filters,
   });
-  const [page, summary, suggestions] = await Promise.all([
+  const [page, summary, suggestions, types] = await Promise.all([
     api(`/tasks?${query}`),
     api(
       "/summary" +
@@ -179,7 +179,9 @@ async function loadTasks() {
           ? `?operator_id=${state.filters.operator_id}`
           : ""),
     ),
+    api("/promise-types"),
   ]);
+  state.types = types;
   state.tasks = page.items;
   state.suggestions = suggestions;
   $("#nav-task-count").textContent =
