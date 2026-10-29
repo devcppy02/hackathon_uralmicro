@@ -230,3 +230,40 @@ def test_summary_invalid_filters_and_missing_review(client):
         client.post("/completion-suggestions/missing/review", json={"accept": True}).status_code
         == 404
     )
+
+
+def test_text_correction_preserves_original_deadline(storage, call, extraction):
+    task = storage.save_calls([call], extraction).tasks[0]
+    updated = Workflow(storage).correct(
+        task.id, TaskCorrection(title="Отправить подписанный договор", reason="Уточнили содержание")
+    )
+    assert updated.due_at == task.due_at
+    assert updated.deadline_source == task.deadline_source
+
+
+def test_changed_task_cannot_accept_stale_model_result(storage, call, extraction):
+    task = storage.save_calls([call], extraction).tasks[0]
+    later = followup(call)
+    save_empty(storage, later)
+    workflow = Workflow(storage)
+    contexts = workflow.completion_contexts([later])
+    evidence = CompletionEvidence(
+        task_id=task.id,
+        call_id=later.id,
+        quote="договор получил",
+        replica_index=0,
+        explanation="Подтверждение клиента",
+    )
+    workflow.correct(task.id, TaskCorrection(title="Другая задача", reason="Уточнение"))
+    assert workflow.save_suggestions([evidence], contexts) == 0
+    assert not workflow.suggestions()
+
+
+def test_review_rechecks_task_revision(storage, call, extraction):
+    workflow, task, _, _ = setup_evidence(storage, call, extraction)
+    proposal = workflow.suggestions()[0]
+    with storage.connect() as db:
+        db.execute("UPDATE tasks SET revision=revision+1 WHERE id=?", (task.id,))
+    with pytest.raises(ConflictError, match="obsolete"):
+        workflow.review(proposal["id"], CompletionDecision(accept=True))
+    assert storage.get_task(task.id).status != "completed"

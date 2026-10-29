@@ -61,6 +61,8 @@ def create_app(
                     await asyncio.gather(worker, return_exceptions=True)
 
     app = FastAPI(title="УралМикро · Контроль обещаний", version="0.1.0", lifespan=lifespan)
+    app.state.telegram = telegram
+    app.state.storage = storage
     static = Path(__file__).parent / "static"
     app.mount("/static", StaticFiles(directory=static), name="static")
 

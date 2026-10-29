@@ -69,6 +69,10 @@ class Notifications:
         now = utcnow()
         with self.storage.connect() as db:
             expire_tasks(db, now)
+            db.execute("""UPDATE notifications SET status='skipped' WHERE status='pending' AND
+                EXISTS (SELECT 1 FROM tasks t WHERE t.id=notifications.task_id AND
+                (t.status='completed' OR (kind!='new' AND due_snapshot!=t.due_at)
+                 OR (kind='reminder' AND t.status='overdue')))""")
             tasks = db.execute("SELECT * FROM tasks WHERE status!='completed'").fetchall()
             for task in tasks:
                 kinds = ["new"]

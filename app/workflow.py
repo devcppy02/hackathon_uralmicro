@@ -67,6 +67,11 @@ class Workflow:
                 for key, value in item.model_dump().items()
                 if key in {"title", "type_code", "due_at"} and value is not None
             }
+            if "due_at" in changes:
+                changes["due_at"] = timestamp(changes["due_at"])
+            changes = {key: value for key, value in changes.items() if value != before[key]}
+            if not changes:
+                return Task(**dict(before))
             if (
                 "type_code" in changes
                 and not db.execute(
@@ -75,7 +80,6 @@ class Workflow:
             ):
                 raise ConflictError("Promise type not found")
             if "due_at" in changes:
-                changes["due_at"] = timestamp(changes["due_at"])
                 changes["deadline_source"] = "manual"
                 changes["deadline_text"] = None
                 if before["status"] == "overdue" and item.due_at >= utcnow():

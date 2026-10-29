@@ -110,6 +110,9 @@ def build_router(storage, workflow, notifications, timezone):
 
     @router.callback_query(F.data.startswith("task:"))
     async def change_status(query: CallbackQuery):
+        if query.data.count(":") != 2:
+            await query.answer("Некорректная кнопка", show_alert=True)
+            return
         _, action, task_id = query.data.split(":", 2)
         task = await run_in_threadpool(storage.get_task, task_id)
         operator_id = await run_in_threadpool(notifications.operator, query.from_user.id)
@@ -137,6 +140,9 @@ def build_router(storage, workflow, notifications, timezone):
 
     @router.callback_query(F.data.startswith("evidence:"))
     async def review(query: CallbackQuery):
+        if query.data.count(":") != 2:
+            await query.answer("Некорректная кнопка", show_alert=True)
+            return
         _, action, suggestion_id = query.data.split(":", 2)
         operator_id = await run_in_threadpool(notifications.operator, query.from_user.id)
         suggestions = await run_in_threadpool(workflow.suggestions, operator_id)
@@ -202,7 +208,7 @@ class TelegramService:
             if item["suggestion"]:
                 text += (
                     "\nПодтверждение в следующем звонке:\n<blockquote>"
-                    + escape(item["suggestion"]["quote"])
+                    + escape(item["suggestion"]["quote"][:600])
                     + "</blockquote>\nПроверьте перед закрытием."
                 )
                 buttons = completion_buttons(item["suggestion_id"])
