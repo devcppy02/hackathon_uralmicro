@@ -1,5 +1,3 @@
-"""Small SQLite repository. Every write is a short, atomic transaction."""
-
 import hashlib
 import json
 import sqlite3
@@ -107,7 +105,7 @@ class Storage:
                 );
                 CREATE INDEX IF NOT EXISTS tasks_filters ON tasks(operator_id, status, due_at);
             """)
-            # Seed once: deleting a default type must survive a restart.
+            # Начальные типы добавляем один раз, чтобы удалённые не вернулись после перезапуска.
             if db.execute("PRAGMA user_version").fetchone()[0] == 0:
                 db.executemany(
                     "INSERT OR IGNORE INTO promise_types VALUES (:code,:name,:description)",
@@ -154,7 +152,6 @@ class Storage:
                 raise ConflictError("Promise type is used by existing tasks") from error
 
     def new_calls(self, calls: list[CallInput]) -> list[CallInput]:
-        """Reject changed IDs, deduplicate both the database and the incoming batch."""
         result = []
         seen = {}
         with self.connect() as db:
@@ -182,7 +179,7 @@ class Storage:
         processed = 0
         now = utcnow()
         with self.connect() as db:
-            # Recheck IDs under the write lock: concurrent webhook retries are safe.
+            # Перепроверяем ID под блокировкой записи, чтобы параллельные повторы не создали дубли.
             db.execute("BEGIN IMMEDIATE")
             for call in calls:
                 digest = fingerprint(call)
@@ -262,7 +259,7 @@ class Storage:
                 ids,
             ).fetchall()
             created = [Task(**dict(row)) for row in rows]
-        # New task count excludes tasks from call IDs committed by another request.
+        # Не считаем новыми задачи из звонков, которые уже сохранил другой запрос.
         count = sum(task.call_id in new_ids for task in created)
         return CallsResult(
             processed=processed,

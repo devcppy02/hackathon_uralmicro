@@ -1,5 +1,3 @@
-"""Persistent Telegram subscriptions and notification outbox in the same SQLite file."""
-
 import hashlib
 import secrets
 from datetime import timedelta

@@ -1,5 +1,3 @@
-"""Opt-in acceptance test: the real Qwen must understand ten synthetic calls."""
-
 import os
 from datetime import datetime, timedelta
 

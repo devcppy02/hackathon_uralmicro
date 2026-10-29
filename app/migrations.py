@@ -1,5 +1,3 @@
-"""Additive, repeatable migration from the original API database."""
-
 import sqlite3
 
 

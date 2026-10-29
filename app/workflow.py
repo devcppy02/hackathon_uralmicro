@@ -1,5 +1,3 @@
-"""Task corrections, audit trail and human review of model evidence."""
-
 import json
 from typing import TYPE_CHECKING
 from uuid import uuid4
@@ -131,7 +129,7 @@ class Workflow:
             return {"totals": totals, "operators": operators}
 
     def completion_contexts(self, calls: list[CallInput]):
-        """Consider stored follow-ups too: an earlier call may arrive late."""
+        """Учитываем сохранённые последующие звонки: исходный звонок может прийти с задержкой."""
         phones = sorted({phone_key(call.client_phone) for call in calls})
         phones = [phone for phone in phones if phone.isdigit() and len(phone) >= 7]
         if not phones:

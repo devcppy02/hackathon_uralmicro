@@ -1,5 +1,3 @@
-"""Opt-in check: create one reusable category, reuse it, then disable auto typing."""
-
 import os
 
 import httpx

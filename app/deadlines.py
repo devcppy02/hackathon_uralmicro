@@ -1,5 +1,3 @@
-"""Resolve common relative deadlines; Qwen supplies other explicit calendar dates."""
-
 import re
 from datetime import datetime, timedelta
 
@@ -37,7 +35,6 @@ RELATIVE = re.compile(
 
 
 def resolve_deadline(promise: ExtractedPromise, ended_at: datetime) -> tuple[datetime, str]:
-    """Return an aware deadline and its source. Unknown means exactly +24 hours."""
     text = (promise.deadline_text or "").lower().replace("ё", "е").strip(" .,!;")
     has_upper_bound = "не позже" in text or "не позднее" in text
     if (
@@ -48,8 +45,8 @@ def resolve_deadline(promise: ExtractedPromise, ended_at: datetime) -> tuple[dat
         return ended_at + timedelta(hours=24), "default_24h"
     if text in {"через полчаса", "в течение получаса"}:
         return ended_at + timedelta(minutes=30), "explicit"
-    # Only a complete relative phrase is safe to compute without losing a clock
-    # time or a condition such as "через два дня после согласования".
+    # Вычисляем только цельную относительную фразу, чтобы не потерять время суток
+    # или условие вроде «через два дня после согласования».
     if match := RELATIVE.fullmatch(text):
         amount_text, unit = match.groups()
         amount = NUMBERS.get(amount_text)

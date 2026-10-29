@@ -1,5 +1,3 @@
-"""OpenAI-compatible HTTP client for local Qwen. No framework or agent abstractions."""
-
 import json
 from zoneinfo import ZoneInfo
 
@@ -122,7 +120,7 @@ class QwenExtractor:
         return result
 
     async def resolve_new_types(self, result: AutoTypeExtraction, types: list[PromiseType]) -> None:
-        """Independently check novelty; later candidates also see approved categories."""
+        """При проверке очередного типа учитываем уже одобренные типы этой пачки."""
         available = list(types)
         approved = []
         for candidate in result.new_types:
@@ -163,10 +161,9 @@ class QwenExtractor:
         result.new_types = approved
 
     async def request(self, schema, prompt, data):
-        """Shared structured-output transport for extraction and completion evidence."""
         json_schema = schema.model_json_schema()
         if schema is AutoTypeExtraction:
-            # Constrain the batch size as well as validating it after generation.
+            # Без ограничения длины массива Qwen может вернуть только первый звонок пачки.
             json_schema["properties"]["calls"].update(
                 minItems=len(data["calls"]), maxItems=len(data["calls"])
             )
@@ -203,7 +200,7 @@ class QwenExtractor:
             if choice["finish_reason"] != "stop":
                 raise LLMError("LLM response was truncated or unfinished")
             message = choice["message"]
-            # Some Qwen/LM Studio versions put the entire JSON in reasoning_content.
+            # Некоторые версии Qwen/LM Studio возвращают весь JSON в reasoning_content.
             content = message.get("content") or message.get("reasoning_content")
             result = schema.model_validate_json(content)
         except httpx.TimeoutException as error:

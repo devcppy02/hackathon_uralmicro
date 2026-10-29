@@ -1,5 +1,3 @@
-"""Optional semantic acceptance test against the actual local Qwen."""
-
 import os
 from datetime import UTC, datetime, timedelta
 

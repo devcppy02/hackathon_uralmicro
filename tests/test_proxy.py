@@ -1,5 +1,3 @@
-"""A machine-wide proxy must not intercept requests to the local model."""
-
 import json
 import threading
 from contextlib import contextmanager
@@ -53,7 +51,6 @@ def test_local_model_bypasses_proxy(monkeypatch, tmp_path, call_json, extraction
         monkeypatch.setenv("NO_PROXY", "")
         monkeypatch.setenv("no_proxy", "")
 
-        # Reproduce the observed 403 before checking that the app avoids it.
         with httpx.Client(timeout=5) as client:
             assert client.post(model + "/v1/chat/completions", json={}).status_code == 403
         assert len(proxy_requests) == 1
