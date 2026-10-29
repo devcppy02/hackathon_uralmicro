@@ -78,6 +78,39 @@ def test_no_later_than_is_an_explicit_deadline(call, promise_json):
     assert resolve_deadline(promise, call.ended_at) == (promise.deadline_at, "explicit")
 
 
+@pytest.mark.parametrize(
+    "text",
+    [
+        "через два дня к 15:00",
+        "через два дня в три часа дня",
+        "как только уточню, но не позднее 31 октября в 15:00",
+    ],
+)
+def test_combined_deadline_preserves_calendar_time(call, promise_json, text):
+    promise = ExtractedPromise(
+        **{
+            **promise_json,
+            "deadline_text": text,
+            "deadline_at": "2026-10-31T15:00:00+05:00",
+        }
+    )
+    assert resolve_deadline(promise, call.ended_at) == (promise.deadline_at, "explicit")
+
+
+def test_unresolved_combined_deadline_uses_default(call, promise_json):
+    promise = ExtractedPromise(
+        **{
+            **promise_json,
+            "deadline_text": "через два дня после согласования",
+            "deadline_at": None,
+        }
+    )
+    assert resolve_deadline(promise, call.ended_at) == (
+        call.ended_at + timedelta(hours=24),
+        "default_24h",
+    )
+
+
 def test_overflow_falls_back_to_default(call, promise_json):
     promise = ExtractedPromise(**{**promise_json, "deadline_text": "через " + "9" * 400 + " дней"})
     assert resolve_deadline(promise, call.ended_at)[1] == "default_24h"
