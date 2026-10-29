@@ -24,6 +24,7 @@ packages = ["app"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 addopts = "--strict-markers --cov=app --cov-report=term-missing --cov-fail-under=95"
 markers = ["live: opt-in requests to the actual LM Studio server"]
 

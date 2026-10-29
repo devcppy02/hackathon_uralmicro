@@ -59,17 +59,16 @@ class CallInput(StrictModel):
         return self
 
 
-CallBatch = Annotated[list[CallInput], Field(min_length=1, max_length=100)]
+CallBatch = Annotated[list[CallInput], Field(min_length=1, max_length=10)]
 
 
-class PromiseTypeCreate(StrictModel):
-    code: str = Field(min_length=2, max_length=64, pattern=r"^[a-z][a-z0-9_]+$")
+class PromiseTypeUpdate(StrictModel):
     name: str = Field(min_length=1, max_length=200)
     description: str = Field(min_length=10, max_length=2000)
 
 
-class PromiseType(PromiseTypeCreate):
-    created_at: AwareDatetime
+class PromiseType(PromiseTypeUpdate):
+    code: str = Field(min_length=2, max_length=64, pattern=r"^[a-z][a-z0-9_]+$")
 
 
 class TaskStatus(StrEnum):
@@ -77,13 +76,6 @@ class TaskStatus(StrEnum):
     IN_PROGRESS = "in_progress"
     COMPLETED = "completed"
     OVERDUE = "overdue"
-
-
-class CallStatus(StrEnum):
-    PENDING = "pending"
-    PROCESSING = "processing"
-    COMPLETED = "completed"
-    FAILED = "failed"
 
 
 class TaskUpdate(StrictModel):
@@ -115,42 +107,11 @@ class TaskPage(StrictModel):
     offset: int
 
 
-class CallDetail(CallInput):
-    status: CallStatus
-    attempts: int
-    error: str | None
-    created_at: AwareDatetime
-    updated_at: AwareDatetime
-    tasks: list[Task]
-
-
-class CallSummary(StrictModel):
-    id: str
-    operator_id: int
-    status: CallStatus
-    attempts: int
-    error: str | None
-    created_at: AwareDatetime
-    updated_at: AwareDatetime
-
-
-class CallPage(StrictModel):
-    items: list[CallSummary]
-    total: int
-    limit: int
-    offset: int
-
-
-class AcceptedCall(StrictModel):
-    id: str
-    duplicate: bool
-    status: CallStatus
-
-
-class BatchAccepted(StrictModel):
-    accepted: int
+class CallsResult(StrictModel):
+    processed: int
     duplicates: int
-    calls: list[AcceptedCall]
+    tasks_created: int
+    tasks: list[Task]
 
 
 class ExtractedPromise(StrictModel):
@@ -162,5 +123,10 @@ class ExtractedPromise(StrictModel):
     deadline_at: AwareDatetime | None
 
 
-class Extraction(StrictModel):
+class CallExtraction(StrictModel):
+    call_id: str
     promises: list[ExtractedPromise] = Field(max_length=50)
+
+
+class Extraction(StrictModel):
+    calls: list[CallExtraction] = Field(max_length=10)
