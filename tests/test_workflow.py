@@ -134,6 +134,8 @@ def test_evidence_requires_human_and_deduplicates(storage, call, extraction, acc
     assert workflow.suggestions(operator_id=999) == []
     decision = workflow.review(suggestion["id"], CompletionDecision(accept=accept, actor="Анна"))
     assert decision["status"] == ("accepted" if accept else "rejected")
+    assert later.id in workflow.history(task.id)[-1]["reason"]
+    assert evidence.quote in workflow.history(task.id)[-1]["reason"]
     assert storage.get_task(task.id).status == ("completed" if accept else "created")
     with pytest.raises(ConflictError):
         workflow.review(suggestion["id"], CompletionDecision(accept=accept))

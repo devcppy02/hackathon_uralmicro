@@ -255,6 +255,8 @@ class Workflow:
                 after,
                 "completion_" + status,
                 decision.actor,
-                decision.reason or suggestion["quote"],
+                (decision.reason + "\n" if decision.reason else "")
+                + f"Звонок {suggestion['call_id']}, реплика {suggestion['replica_index'] + 1}: "
+                + suggestion["quote"],
             )
             return {"status": status, "task": Task(**dict(after)).model_dump(mode="json")}
