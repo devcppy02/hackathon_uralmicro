@@ -55,9 +55,10 @@ async def test_new_category_requires_separate_novelty_check(call, auto_extractio
     assert result.new_types == [ESCALATION]
     assert result.calls[0].promises[0].type_code == ESCALATION.code
     assert len(requests) == 2
-    assert requests[0]["response_format"]["json_schema"]["schema"] == (
-        AutoTypeExtraction.model_json_schema()
-    )
+    schema = requests[0]["response_format"]["json_schema"]["schema"]
+    assert schema["properties"]["calls"]["minItems"] == 1
+    assert schema["properties"]["calls"]["maxItems"] == 1
+    assert schema["$defs"]["CallExtraction"]["properties"]["call_id"]["enum"] == [call.id]
     check = json.loads(requests[1]["messages"][1]["content"])
     assert check["candidate_type"] == ESCALATION.model_dump()
     assert {t["code"] for t in check["promise_types"]} == {t.code for t in DEFAULT_TYPES}
@@ -86,6 +87,27 @@ async def test_existing_categories_need_no_review(call, extraction):
     assert len(requests) == 1
     assert result.new_types == []
     assert result.calls == extraction.calls
+
+
+async def test_auto_schema_requires_every_call_in_batch(call, extraction):
+    second = call.model_copy(update={"id": "call-2"})
+    result = AutoTypeExtraction(
+        calls=[*extraction.calls, CallExtraction(call_id=second.id, promises=[])], new_types=[]
+    )
+
+    def handler(request):
+        schema = json.loads(request.content)["response_format"]["json_schema"]["schema"]
+        assert schema["properties"]["calls"]["minItems"] == 2
+        assert schema["properties"]["calls"]["maxItems"] == 2
+        assert schema["$defs"]["CallExtraction"]["properties"]["call_id"]["enum"] == [
+            call.id,
+            second.id,
+        ]
+        return httpx.Response(200, json=llm_response(result))
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        extractor = QwenExtractor(client, Settings(_env_file=None, auto_create_promise_types=True))
+        assert await extractor.extract([call, second], DEFAULT_TYPES) == result
 
 
 async def test_same_name_reuses_existing_type_without_extra_request(call, auto_extraction):

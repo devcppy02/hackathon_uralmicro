@@ -2,11 +2,15 @@
 
 import os
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 
 from app.api import create_app
 from app.config import Settings
+from app.llm import QwenExtractor
+from app.models import AutoTypeExtraction, PromiseType
+from app.storage import DEFAULT_TYPES
 
 pytestmark = [
     pytest.mark.live,
@@ -26,6 +30,25 @@ def make_call(number, text):
         "ended_at": "2026-10-29T10:05:00+05:00",
         "transcript": [{"speaker": "operator", "text": text}],
     }
+
+
+async def test_real_qwen_novelty_review_reuses_document_category(extraction):
+    result = AutoTypeExtraction(
+        **extraction.model_dump(),
+        new_types=[
+            PromiseType(
+                code="send_contract",
+                name="Отправить договор",
+                description="Оператор обещает отправить клиенту договор.",
+            )
+        ],
+    )
+    result.calls[0].promises[0].type_code = "send_contract"
+    async with httpx.AsyncClient(trust_env=False) as client:
+        extractor = QwenExtractor(client, Settings(_env_file=None, auto_create_promise_types=True))
+        await extractor.resolve_new_types(result, DEFAULT_TYPES)
+    assert result.new_types == []
+    assert result.calls[0].promises[0].type_code == "send_documents"
 
 
 def test_real_qwen_creates_reusable_category_without_splitting_existing_types(tmp_path):
