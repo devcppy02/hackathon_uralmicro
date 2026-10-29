@@ -67,6 +67,17 @@ def test_past_explicit_deadline_not_moved_forward(call, promise_json):
     assert resolve_deadline(promise, call.ended_at)[0] < call.ended_at
 
 
+def test_no_later_than_is_an_explicit_deadline(call, promise_json):
+    promise = ExtractedPromise(
+        **{
+            **promise_json,
+            "deadline_text": "не позже завтра в 10:00",
+            "deadline_at": "2026-10-30T10:00:00+05:00",
+        }
+    )
+    assert resolve_deadline(promise, call.ended_at) == (promise.deadline_at, "explicit")
+
+
 def test_overflow_falls_back_to_default(call, promise_json):
     promise = ExtractedPromise(**{**promise_json, "deadline_text": "через " + "9" * 400 + " дней"})
     assert resolve_deadline(promise, call.ended_at)[1] == "default_24h"

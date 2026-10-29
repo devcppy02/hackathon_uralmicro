@@ -4,7 +4,6 @@ import json
 from zoneinfo import ZoneInfo
 
 import httpx
-from pydantic import ValidationError
 
 from app.config import Settings
 from app.models import CallExtraction, CallInput, Extraction, PromiseType
@@ -99,7 +98,7 @@ class QwenExtractor:
             raise LLMError(f"LM Studio returned HTTP {error.response.status_code}") from error
         except httpx.RequestError as error:
             raise LLMError("Cannot connect to LM Studio") from error
-        except (ValueError, TypeError, KeyError, IndexError, ValidationError) as error:
+        except (ValueError, TypeError, KeyError, IndexError, AttributeError) as error:
             raise LLMError("LM Studio returned an invalid response") from error
         self.validate(result, calls, types)
         return result

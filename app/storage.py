@@ -201,9 +201,11 @@ class Storage:
                         values[name] = timestamp(getattr(task, name))
                     try:
                         db.execute(
-                            "INSERT OR IGNORE INTO tasks VALUES ("
+                            "INSERT INTO tasks ("
+                            + ",".join(values)
+                            + ") VALUES ("
                             + ",".join(f":{name}" for name in values)
-                            + ")",
+                            + ") ON CONFLICT(id) DO NOTHING",
                             values,
                         )
                     except sqlite3.IntegrityError as error:

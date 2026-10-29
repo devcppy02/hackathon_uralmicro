@@ -80,6 +80,8 @@ async def test_http_errors(call, status):
     [
         {},
         {"choices": []},
+        {"choices": [{"finish_reason": "stop", "message": None}]},
+        {"choices": [{"finish_reason": "stop", "message": []}]},
         {"choices": [{"finish_reason": "stop", "message": {}}]},
         {"choices": [{"finish_reason": "stop", "message": {"content": "not JSON"}}]},
         {"choices": [{"finish_reason": "stop", "message": {"content": "{}"}}]},

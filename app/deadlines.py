@@ -39,7 +39,9 @@ RELATIVE = re.compile(
 def resolve_deadline(promise: ExtractedPromise, ended_at: datetime) -> tuple[datetime, str]:
     """Return an aware deadline and its source. Unknown means exactly +24 hours."""
     text = (promise.deadline_text or "").lower().replace("ё", "е")
-    if not text or re.search(r"скоро|позже|когда|как только|возможност|на днях", text):
+    if not text or re.search(
+        r"^(?:скоро|позже|когда\b|как только\b|при .*возможност|на днях)", text
+    ):
         return ended_at + timedelta(hours=24), "default_24h"
     if "через полчаса" in text or "в течение получаса" in text:
         return ended_at + timedelta(minutes=30), "explicit"
