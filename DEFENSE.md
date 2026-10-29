@@ -140,3 +140,17 @@ SQLite даёт хранение на диске и транзакции. Мас
       на 7 минут и ответы на вопросы. Файла презентации в репозитории нет.
 
 Нельзя честно считать эти пункты выполненными только потому, что API написан.
+
+
+@'
+import httpx
+from app.config import Settings
+url = Settings().llm_base_url + '/models'
+print('URL:', url)
+for trust in (True, False):
+    try:
+        r = httpx.get(url, trust_env=trust, timeout=10)
+        print('trust_env=', trust, 'HTTP=', r.status_code, 'body=', r.text[:160])
+    except Exception as e:
+        print('trust_env=', trust, type(e).name)
+'@ | .\.venv\Scripts\python.exe -
